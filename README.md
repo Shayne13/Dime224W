@@ -13,8 +13,6 @@ RECIPIENTS:
   cfsdyn REAL, // CFscore for that particular election cycle, assuming contributor ideologies never change
   gender INTEGER, // 1 if female, 0 if male
   winner INTEGER, // 1 if won, 0 if lost
-  paccontribs REAL, // Total contributions from PACs
-  indivcontribs REAL, // Total contributions from individuals
   primary INTEGER, // 1 if participated in primary, 0 otherwise
   districtpartisanship REAL // Kernell's (2009) measurement of district partisanship for current cycle
   indistrict REAL, // Proportion of donations coming from donors within the district
