@@ -5,15 +5,16 @@ SCHEMAS FOR THE DATABASES:
 RECIPIENTS:
   year INTEGER,                // The election cycle this particular campaign was for
   rid TEXT,                    // A unique ID assigned to each recipient that lasts across cycles and campaigns
-  party INTEGER,               // 1 if GOP, 2 if Dem, 3 if other (indepedent, 3rd party, whatever)
+  party INTEGER,               // 1 if Dem, 2 if GOP, 3 if other (indepedent, 3rd party, whatever)
   seat TEXT,                   // The office being sought (e.g. presidency, US Senate, State House)
   district VARCHAR(8),         // A code for the candidate's district
-  incumb INTEGER,              // 1 if incumbent, 0 if challenger
+  incumb INTEGER,              // 0 if open seat, 1 if incumbent, 2 if challenger, -1 if empty cell
   cfs REAL,                    // Overall candidate CFscore
   cfsdyn REAL,                 // CFscore for that particular election cycle, assuming contributor ideologies never change
-  gender INTEGER,              // 1 if female, 0 if male
+  numgivers INTEGER,           // Total number of donations received
+  gender INTEGER,              // 0 if organization or unknown (U), 1 if female (F), 2 if male (M)
+  primary INTEGER,             // 1 if participated in primary 0 otherwise
   winner INTEGER,              // 1 if won, 0 if lost
-  primary INTEGER,             // 1 if participated in primary, 0 otherwise
   districtpartisanship REAL,   // Kernell's (2009) measurement of district partisanship for current cycle
   indistrict REAL,             // Proportion of donations coming from donors within the district
   instate REAL,                // Proportion of donations coming from donors within the state
