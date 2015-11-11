@@ -15,7 +15,7 @@ RECIPIENTS:
   gender INTEGER,              // 1 if female (F), 0 if male (M)
   didprimary INTEGER,          // 1 if participated in primary 0 otherwise
   winner INTEGER,              // 1 if won, 0 if lost
-  districtpartisanship REAL,   // Kernell's (2009) measurement of district partisanship for current cycle
+  partisanship REAL,   // Kernell's (2009) measurement of district partisanship for current cycle
   indistrict REAL,             // Proportion of donations coming from donors within the district
   instate REAL,                // Proportion of donations coming from donors within the state
   candstatus INTEGER,          // 1 if statutory candidate (C), 2 if statutory candidate for future cycle (F), 3 if not yet statutory candidate (N), 4 if statutory candidate in prior cycle (P)
