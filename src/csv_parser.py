@@ -11,30 +11,16 @@ csv_1982 = csv_dir + 'contribDB_1982.csv'
 recipient_path = csv_dir + 'candidate_cfscores_st_fed_1979_2012.csv'
 contributors_path = csv_dir + 'contributor_cfscores_st_fed_1979_2012.csv'
 
-def loadAllTransactionFilesInDir(dbName, dirpath):
-    print '------------- Loading All Transaction Tables -------------'
-    start = time.time()
-    transFiles = [f for f in listdir_nohidden(dirpath) if (f.split('_')[0] == "contribDB")]
-    initTransactionsTable(dbName)
-    for tf in transFiles:
-        loadTransactionFile(dbName, dirpath + tf, int(tf.split('_')[1][0:4]))
-    print 'Total time taken: ' + str(time.time() - start)
-
 def loadDBForCycle(cycle):
     csvName = 'Data/CSVs/contribDB_%d.csv' % cycle
     dbName = db_dir + str(cycle) + '.db'
     loadTransactionFile(dbName, csvName, cycle)
 
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
-
 def loadTransactionFile(dbName, csvName, year):
     print 'Loading Transactions_{0} into Table:'.format(year)
     start = time.time()
-    extractors = [0, 1, 2, 3, 4, 5, 27, 34]
-    transforms = [int, str, str, strToFltToInt, str, strToFltToInt, str, str]
+    extractors = [0, 1, 2, 3, 4, 5, 13, 27, 28, 29, 33, 34, 36, 37]
+    transforms = [int, str, str, strToFltToInt, str, strToFltToInt, indiv, str, party, candOrComm, str, str, safeFloat, safeFloat]
     initTransactionsTable(dbName)
 
     with open(csvName, 'r') as f:
@@ -54,12 +40,14 @@ def loadRecipients(dbNames, filepath):
 
     for db in dbNames:
         initRecipientTable(db)
-    reader = csv.reader(open(filepath, 'rb'))
-    reader.next() # skip column headers
-    for i, block in enumerate(generateChunk(reader, extractors, transforms)):
-        newBlock = extractDuplicateRecipients(block, observedKeys)
-        for db in dbNames:
-            commitRecipBlock(db, newBlock)
+
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f)
+        reader.next() # skip column headers
+        for i, block in enumerate(generateChunk(reader, extractors, transforms)):
+            newBlock = extractDuplicateRecipients(block, observedKeys)
+            for db in dbNames:
+                commitRecipBlock(db, newBlock)
 
     print 'Time taken: ' + str(time.time() - start)
 
@@ -156,8 +144,8 @@ def candStatus(code):
     else: return None
 
 def candOrComm(code):
-    if (code == 'comm'): return 0
-    elif (code == 'cand'): return 1
+    if (code.lower() == 'comm'): return 0
+    elif (code.lower() == 'cand'): return 1
     else: return None
 
 # ----- Block Commit Functions -----
@@ -190,7 +178,7 @@ def commitTransBlock(dbName, block):
         con = sql.connect(dbName)
         cur = con.cursor()
 
-        cur.executemany("INSERT INTO Transactions VALUES(?,?,?,?,?,?,?,?)", block)
+        cur.executemany("INSERT INTO Transactions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", block)
         con.commit()
 
     except sql.Error, e:
@@ -246,7 +234,7 @@ def generateChunk(reader, extractors, transforms, chunksize=20000):
 # ----- Table Init Functions -----
 
 # Initializes a Transaction table for a particular year:
-# Columns: [1, 2, 3, 4, 5, 27, 34]
+# Columns: [0, 1, 2, 3, 4, 5, 13, 27, 28, 29, 33, 34, 36, 37]
 def initTransactionsTable(dbName):
     con = None
     try:
@@ -262,8 +250,14 @@ def initTransactionsTable(dbName):
             amount INTEGER,
             date VARCHAR(10),
             cid INTEGER,
+            indiv INTEGER,
             rid TEXT,
+            party INTEGER,
+            candOrComm INTEGER,
+            district VARCHAR(8),
             seat TEXT,
+            cfscore REAL,
+            cfs REAL,
             PRIMARY KEY(year, tid),
             FOREIGN KEY(cid) REFERENCES Contributors(cid),
             FOREIGN KEY(rid) REFERENCES Recipients(rid),
@@ -355,10 +349,8 @@ if __name__ == '__main__':
     dbNames = [db_dir + str(cycle) + '.db' for cycle in range(1980, 2014, 2)]
     #loadRecipients(dbNames, recipient_path)
     #loadContributors(dbNames, contributors_path)
-    for cycle in range(2006, 2014, 2):
+    for cycle in range(1980, 1990, 2):
         loadDBForCycle(cycle)
-    #loadAllTransactionFilesInDir(db_name, 'Data/CSVs/')
-    #loadRecipients(db_name, recipient_path)
 
 # ----- USEFUL CODE FOR DEBUGGING: -----
 
