@@ -5,70 +5,79 @@ import sys, csv, re, os, time
 import sqlite3 as sql
 from itertools import chain
 
-db_name = 'master.db'
-csv_1982 = 'Data/contribDB_1982.csv'
-recipient_path = 'Data/candidate_cfscores_st_fed_1979_2012.csv'
-contributors_path = 'Data/contributor_cfscores_st_fed_1979_2012.csv'
-loadAllTransactionFilesInDir(db_name, 'Data/')
-loadRecipients(db_name, recipient_path)
-loadContributors(db_name, contributors_path)
+csv_dir = 'Data/CSVs/'
+db_dir = 'Data/DBs/'
+csv_1982 = csv_dir + 'contribDB_1982.csv'
+recipient_path = csv_dir + 'candidate_cfscores_st_fed_1979_2012.csv'
+contributors_path = csv_dir + 'contributor_cfscores_st_fed_1979_2012.csv'
 
 def loadAllTransactionFilesInDir(dbName, dirpath):
     print '------------- Loading All Transaction Tables -------------'
     start = time.time()
-    transFiles = [ f for f in listdir_nohidden(dirpath) if (f.split('_')[0] == "contribDB") ]
+    transFiles = [f for f in listdir_nohidden(dirpath) if (f.split('_')[0] == "contribDB")]
     initTransactionsTable(dbName)
     for tf in transFiles:
         loadTransactionFile(dbName, dirpath + tf, int(tf.split('_')[1][0:4]))
-    print 'Total time taken: ' + str(time.time() - start) 
+    print 'Total time taken: ' + str(time.time() - start)
+
+def loadDBForCycle(cycle):
+    csvName = 'Data/CSVs/contribDB_%d.csv' % cycle
+    dbName = db_dir + str(cycle) + '.db'
+    loadTransactionFile(dbName, csvName, cycle)
 
 def listdir_nohidden(path):
     for f in os.listdir(path):
         if not f.startswith('.'):
             yield f
 
-def loadTransactionFile(dbName, filepath, year):
+def loadTransactionFile(dbName, csvName, year):
     print 'Loading Transactions_{0} into Table:'.format(year)
     start = time.time()
     extractors = [0, 1, 2, 3, 4, 5, 27, 34]
     transforms = [int, str, str, strToFltToInt, str, strToFltToInt, str, str]
-    
-    reader = csv.reader(open(filepath, 'rb'))
-    reader.next() # skip column headers
-    for i, block in enumerate(generateChunk(reader, extractors, transforms)):
-        commitTransBlock(dbName, block)
-        
+    initTransactionsTable(dbName)
+
+    with open(csvName, 'r') as f:
+        reader = csv.reader(f)
+        reader.next() # skip column headers
+        for i, block in enumerate(generateChunk(reader, extractors, transforms)):
+            commitTransBlock(dbName, block)
+
     print 'Time taken: ' + str(time.time() - start)
 
-def loadRecipients(dbName, filepath):
-    print '------------- Loading Recipients Table -------------'
+def loadRecipients(dbNames, filepath):
+    print '------------- Loading Recipients Tables -------------'
     start = time.time()
     extractors = [0, 7, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
     transforms = [int, str, party, str, str, incumb, float, float, int, gender, safeInt, winner, safeFloat, safeFloat, safeFloat, candStatus, int, candOrComm]
     observedKeys = set()
-    
-    initRecipientTable(dbName)
+
+    for db in dbNames:
+        initRecipientTable(db)
     reader = csv.reader(open(filepath, 'rb'))
     reader.next() # skip column headers
     for i, block in enumerate(generateChunk(reader, extractors, transforms)):
         newBlock = extractDuplicateRecipients(block, observedKeys)
-        commitRecipBlock(dbName, newBlock)
-    
-    print 'Time taken: ' + str(time.time() - start) 
+        for db in dbNames:
+            commitRecipBlock(db, newBlock)
 
-def loadContributors(dbName, filepath):
-    print '------------- Loading Contributors Table -------------'
+    print 'Time taken: ' + str(time.time() - start)
+
+def loadContributors(dbNames, filepath):
+    print '------------- Loading Contributors Tables -------------'
     start = time.time()
     extractors = [0, 1, 2, 3]
     transforms = [int, indiv, str, safeFloat]
-    
-    initContributorsTable(dbName)
+
+    for db in dbNames:
+        initContributorsTable(db)
     reader = csv.reader(open(filepath, 'rb'))
     reader.next() # skip column headers
     for i, block in enumerate(generateChunk(reader, extractors, transforms)):
-        commitContribBlock(dbName, block)
-    
-    print 'Time taken: ' + str(time.time() - start) 
+        for db in dbNames:
+            commitContribBlock(db, block)
+
+    print 'Time taken: ' + str(time.time() - start)
 
 # Ensures that all recipients have unique (year, rid, seat) keys
 # and that only the first row is taken.
@@ -154,12 +163,12 @@ def candOrComm(code):
 # ----- Block Commit Functions -----
 
 def commitContribBlock(dbName, block):
-    
+
     con = None
     try:
         con = sql.connect(dbName)
-        cur = con.cursor()  
-        
+        cur = con.cursor()
+
         cur.executemany("INSERT INTO Contributors VALUES(?,?,?,?)", block)
 
         con.commit()
@@ -172,15 +181,15 @@ def commitContribBlock(dbName, block):
 
     finally:
 
-        if con: con.close() 
+        if con: con.close()
 
 def commitTransBlock(dbName, block):
 
     con = None
     try:
         con = sql.connect(dbName)
-        cur = con.cursor()  
-        
+        cur = con.cursor()
+
         cur.executemany("INSERT INTO Transactions VALUES(?,?,?,?,?,?,?,?)", block)
         con.commit()
 
@@ -192,15 +201,15 @@ def commitTransBlock(dbName, block):
 
     finally:
 
-        if con: con.close() 
+        if con: con.close()
 
 def commitRecipBlock(dbName, block):
 
     con = None
     try:
         con = sql.connect(dbName)
-        cur = con.cursor()  
-        
+        cur = con.cursor()
+
         cur.executemany("INSERT INTO Recipients VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", block)
 
         con.commit()
@@ -213,7 +222,7 @@ def commitRecipBlock(dbName, block):
 
     finally:
 
-        if con: con.close() 
+        if con: con.close()
 
 # Takes a CSV reader, the column indexes we are interested in, and the
 # function transformations for each of those indexes, and returns a
@@ -243,7 +252,7 @@ def initTransactionsTable(dbName):
     try:
         con = sql.connect(dbName)
         cur = con.cursor()
-        
+
         cur.execute("DROP TABLE IF EXISTS Transactions")
         cur.executescript("""
         CREATE TABLE Transactions(
@@ -260,7 +269,7 @@ def initTransactionsTable(dbName):
             FOREIGN KEY(rid) REFERENCES Recipients(rid),
             FOREIGN KEY(seat) REFERENCES Recipients(seat)
         );""")
-                    
+
     except sql.Error, e:
 
         if con: con.rollback()
@@ -269,7 +278,7 @@ def initTransactionsTable(dbName):
 
     finally:
 
-        if con: con.close() 
+        if con: con.close()
 
 # Initializes the Contributors table:
 # Columns: [0, 1, 2]
@@ -277,12 +286,12 @@ def initContributorsTable(dbName):
     con = None
     try:
         con = sql.connect(dbName)
-        cur = con.cursor()  
+        cur = con.cursor()
 
         cur.execute("DROP TABLE IF EXISTS Contributors")
         cur.executescript("""
             CREATE TABLE Contributors(
-              cid INTEGER PRIMARY KEY, 
+              cid INTEGER PRIMARY KEY,
               indiv INTEGER,
               state VARCHAR(4),
               cfscore REAL
@@ -298,7 +307,7 @@ def initContributorsTable(dbName):
 
     finally:
 
-        if con: con.close() 
+        if con: con.close()
 
 # Columns: [0, 7, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
 # 39-ran primary  , 46 winner, 47 district partisanship, 61 in district donations
@@ -307,7 +316,7 @@ def initRecipientTable(dbName):
     try:
         con = sql.connect(dbName)
         cur = con.cursor()
-        
+
         cur.execute("DROP TABLE IF EXISTS Recipients")
         cur.executescript("""
             CREATE TABLE Recipients(
@@ -342,12 +351,21 @@ def initRecipientTable(dbName):
     finally:
         if con: con.close()
 
+if __name__ == '__main__':
+    dbNames = [db_dir + str(cycle) + '.db' for cycle in range(1980, 2014, 2)]
+    #loadRecipients(dbNames, recipient_path)
+    #loadContributors(dbNames, contributors_path)
+    for cycle in range(2006, 2014, 2):
+        loadDBForCycle(cycle)
+    #loadAllTransactionFilesInDir(db_name, 'Data/CSVs/')
+    #loadRecipients(db_name, recipient_path)
+
 # ----- USEFUL CODE FOR DEBUGGING: -----
 
 # lst = []
 # extractors = [0, 7, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
 # transforms = [int, str, party, str, str, incumb, float, float, int, gender, safeInt, winner, safeFloat, safeFloat, safeFloat, candStatus, int, candOrComm]
-    
+
 # xst = map(lst.__getitem__, extractors)
 # print xst
 
