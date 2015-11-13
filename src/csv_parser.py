@@ -347,9 +347,9 @@ def initRecipientTable(dbName):
 
 if __name__ == '__main__':
     dbNames = [db_dir + str(cycle) + '.db' for cycle in range(1980, 2014, 2)]
-    #loadRecipients(dbNames, recipient_path)
-    #loadContributors(dbNames, contributors_path)
-    for cycle in range(1980, 1990, 2):
+    loadRecipients(dbNames, recipient_path)
+    loadContributors(dbNames, contributors_path)
+    for cycle in range(1980, 1996, 2):
         loadDBForCycle(cycle)
 
 # ----- USEFUL CODE FOR DEBUGGING: -----
