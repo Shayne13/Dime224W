@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-import snap, time
+import snap, time, sys
 import sqlite3 as lite
-import sys
+from util import pickler
 
 # Define the node attributes (the columns of the Recipients and Contributors tables)
 intAttribsNode = set([
@@ -228,6 +228,8 @@ def getRelevantTransactions(graph, cur, contribMapping, recipientMapping):
             val = transaction[index]
             addEdgeAttrib(graph, edgeID, val, attrib)
 
+    return edgeMapping
+
 def createAndSaveGraph(year):
     G = snap.TNEANet.New()
 
@@ -238,13 +240,19 @@ def createAndSaveGraph(year):
         cur = con.cursor()
         contribMapping = getRelevantDonors(G, cur)
         recipMapping = getRelevantRecipients(G, cur)
-        getRelevantTransactions(G, cur, contribMapping, recipMapping)
+        edgeMapping = getRelevantTransactions(G, cur, contribMapping, recipMapping)
 
-    # Save the graph to a file in Data/Graphs
-    outfile = 'Data/Graphs/%d.graph' % year
+    # Save the graph to a file in Data/Bipartite-Graphs
+    outfile = 'Data/Bipartite-Graphs/%d.graph' % year
     FOut = snap.TFOut(outfile)
     G.Save(FOut)
     FOut.Flush()
+
+    # Save the edge, contributor, and recipient mappings to files in Data/Mappings
+    mapPrefix = 'Data/Mappings/%d' % year
+    pickler.save(contribMapping, mapPrefix + '.contribs')
+    pickler.save(recipMapping, mapPrefix + '.recips')
+    pickler.save(edgeMapping, mapPrefix + '.edges')
 
 if __name__ == '__main__':
     for year in range(1980, 1996, 2):
