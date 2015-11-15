@@ -109,6 +109,7 @@ def getRelevantDonors(graph, cur):
         cid = donor[contributorIndices['cid']]
         cnodeid = graph.AddNode()
         graph.AddIntAttrDatN(cnodeid, 0, 'IsRecip')
+        graph.AddIntAttrDatN(cnodeid, 1, 'IsFullNode')
 
         contributorMapping[cid] = cnodeid
 
@@ -138,6 +139,7 @@ def getRelevantRecipients(graph, cur):
         # Add this node and note that it is a recipient
         rnodeid = graph.AddNode()
         graph.AddIntAttrDatN(rnodeid, 1, 'IsRecip')
+        graph.AddIntAttrDatN(rnodeid, 1, 'IsFullNode')
 
         # Add a mapping from the year/rid/seat primary key to the rnodeid
         year = rec[recipientIndices['year']]
@@ -161,6 +163,7 @@ def getRelevantRecipients(graph, cur):
 def addContributorFromTransaction(graph, transaction):
     cnodeid = graph.AddNode()
     graph.AddIntAttrDatN(cnodeid, 'IsRecip', 0)
+    graph.AddIntAttrDatN(cnodeid, 0, 'IsFullNode')
 
     for attrib in set(transactionIndices).intersection(set(contributorIndices)):
         val = transaction[transactionIndices[attrib]]
@@ -172,6 +175,7 @@ def addContributorFromTransaction(graph, transaction):
 def addRecipientFromTransaction(graph, transaction):
     rnodeid = graph.AddNode()
     graph.AddIntAttrDatN(rnodeid, 'IsRecip', 1)
+    graph.AddIntAttrDatN(rnodeid, 0, 'IsFullNode')
 
     for attrib in set(transactionIndices).intersection(set(recipientIndices)):
         val = transaction[transactionIndices[attrib]]
