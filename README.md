@@ -4,25 +4,25 @@
 
 ## Data/CSVs
 
-Stores the raw, unzipped CSV files downloaded from DIME
-Filenames for transactions follow pattern Data/CSVs/contribDB\_<year>.csv
-Candidates in file Data/CSVs/candidate\_cfscores\_st\_fed\_1979\_2012.csv
-Contributors in file Data/CSVs/contributor\_cfscores\_st\_fed\_1979\_2012.csv
+* Stores the raw, unzipped CSV files downloaded from DIME
+* Filenames for transactions follow pattern Data/CSVs/contribDB\_*year*.csv
+* Candidates in file Data/CSVs/candidate\_cfscores\_st\_fed\_1979\_2012.csv
+* Contributors in file Data/CSVs/contributor\_cfscores\_st\_fed\_1979\_2012.csv
 
 ## Data/DBs
 
-Stores the SQL DB files created from the CSVs, one per cycle
-Filenames follow pattern Data/DBs/<year>.db
+* Stores the SQL DB files created from the CSVs, one per cycle
+* Filenames follow pattern Data/DBs/*year*.db
 
 ## Data/Bipartite-Graphs
 
-Stores the bipartite (donor-candidate) graphs created in snap.py, one per cycle
-Filenames follow pattern Data/Bipartite-Graphs/<year>.graph
+* Stores the bipartite (donor-candidate) graphs created in snap.py, one per cycle
+* Filenames follow pattern Data/Bipartite-Graphs/<year>.graph
 
 ## Data/Mappings
 
-Stores the mappings from primary keys for the SQL tables to the node/edge IDs
-Filenames follow pattern Data/Mappings/<year>.(edge/recips/contribs)
+* Stores the mappings from primary keys for the SQL tables to the node/edge IDs
+* Filenames follow pattern Data/Mappings/*year*.(edge/recips/contribs)
 
 # Schemas for the databases:
 
