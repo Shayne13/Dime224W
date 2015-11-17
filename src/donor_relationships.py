@@ -47,13 +47,7 @@ def createDonorDonorGraph(year, weightF):
 
             # Get the set of all the candidates both donors donated to, and
             # move on if they have none in common
-            try:
-                sharedCands = cands[id1].intersection(cands[id2])
-            except Exception as inst:
-                print id1, id2
-                print cands[id1]
-                print cands[id2]
-                raise inst
+            sharedCands = cands[id1].intersection(cands[id2])
             if not sharedCands:
                 continue
 
@@ -71,14 +65,14 @@ def createDonorDonorGraph(year, weightF):
                 sharedAmount,
                 len(cands[id1].union(cands[id2])),
                 numDonations[id1] + numDonations[id2],
-                totalAmount[id1] + totalAmount[id2],
+                totalAmount[id1] + totalAmount[id2]
             )
 
             # Add the edges between the two nodes and their weights
             e1 = unipartiteGraph.AddEdge(id1, id2)
             e2 = unipartiteGraph.AddEdge(id2, id1)
-            unipartiteGraph.AddFltAttrDatE(e1, 'weight', weight)
-            unipartiteGraph.AddFltAttrDatE(e2, 'weight', weight)
+            unipartiteGraph.AddFltAttrDatE(e1, weight, 'weight')
+            unipartiteGraph.AddFltAttrDatE(e2, weight, 'weight')
         nodesDone += 1
         if nodesDone % 100 == 0:
             print 'Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes())
