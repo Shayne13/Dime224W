@@ -159,7 +159,7 @@ def getRelevantRecipients(graph, cur):
     # Return a mapping from db primary keys (year/rid/seat) to node IDs
     return recipientMapping
 
-# Add a new, stripped-down contributor node usng info from a trnasaction
+# Add a new, stripped-down contributor node usng info from a transaction
 def addContributorFromTransaction(graph, transaction):
     cnodeid = graph.AddNode()
     graph.AddIntAttrDatN(cnodeid, 'IsRecip', 0)
