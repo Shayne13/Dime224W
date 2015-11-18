@@ -6,14 +6,7 @@ from util import pickler
 import scipy.sparse as sp
 
 # Given an election cycle and a weighting function, creates a unipartite
-# donor-donor graph. The weighting function must take in the following
-# parameters, all numbers:
-# 1. The number of candidates the two donors have in common
-# 2. The number of donations the two donors made to shared candidates
-# 3. The total amount the two donors donated to shared candidates
-# 4. The total number of candidates the two donors donated to
-# 5. The total number of donations the two donors made
-# 6. The total amount the two donors donated
+# donor-donor graph. The weighting function is described further down in this file.
 def createDonorDonorGraph(year, weightF):
     print 'Creating donor-donor graph for %d' % year
     start = time.time()
@@ -77,16 +70,16 @@ def createDonorDonorGraph(year, weightF):
             reportTime('Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes()), start)
 
     N = len(newToOld)
-    jaccardAdjMat = sp.coo_matrix((jaccardData, (r, c)), shape = (N, N))
-    jaccard2AdjMat = sp.coo_matrix((jaccard2Data, (r, c)), shape = (N, N))
-    affinityAdjMat = sp.coo_matrix((affinityData, (r, c)), shape = (N, N))
+    jaccardAdjMat = sp.csr_matrix((jaccardData, (r, c)), shape = (N, N))
+    jaccard2AdjMat = sp.csr_matrix((jaccard2Data, (r, c)), shape = (N, N))
+    affinityAdjMat = sp.csr_matrix((affinityData, (r, c)), shape = (N, N))
 
     reportTime('Unipartite Graph complete.', start)
-    return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat
+    return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat, newToOld, oldToNew
 
 # Takes in the bipartite graph and generates the initial unipartiteGraph with just nodes
 # and node attributes.
-def cloneBipartiteNodes(bipartiteGraph, cands, threshold = 1):
+def cloneBipartiteNodes(bipartiteGraph, cands, threshold = 2):
     # Create the new donor-donor graph
     unipartiteGraph = snap.TUNGraph.New()
     oldToNew = {}
@@ -227,7 +220,7 @@ if __name__ == '__main__':
     start = time.time()
     for year in range(1980, 1996, 2):
 
-        graph, wmat1, wmat2, wmat3 = createDonorDonorGraph(year, getWeightScores)
+        graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
 
         # Save the SNAP graph:
         outfile = '../Data/Unipartite-Graphs/%d.graph' % year
@@ -240,6 +233,11 @@ if __name__ == '__main__':
         pickler.save(wmat1, matrixPrefix + '.jaccard')
         pickler.save(wmat2, matrixPrefix + '.jaccard2')
         pickler.save(wmat3, matrixPrefix + '.affinity')
+
+        # Save the bipartite-unipartite corresponding node ID dictionaries:
+        mappingPrefix = '../Data/Unipartite-NodeMappings/%d' % year
+        pickler.save(newToOld, mappingPrefix + '.newToOld')
+        pickler.save(oldToNew, mappingPrefix + '.oldToNew')
 
     print 'Created all unipartite graphs in %d' % (time.time() - start)
 
