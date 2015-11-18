@@ -12,7 +12,7 @@ def createDonorDonorGraph(year, weightF):
     start = time.time()
 
     # Load the old bipartite graph graph
-    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
+    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('Data/Bipartite-Graphs/%d.graph' % year))
 
     # Load the info about each donor and their recipients
     numDonations, totalAmount, cands, transactions, amounts = getDonorInfos(bipartiteGraph)
@@ -44,10 +44,10 @@ def createDonorDonorGraph(year, weightF):
                 oldID1,
                 oldID2,
                 sharedCands,
-                numDonations, 
-                totalAmount, 
-                cands, 
-                transactions, 
+                numDonations,
+                totalAmount,
+                cands,
+                transactions,
                 amounts
             )
 
@@ -64,7 +64,7 @@ def createDonorDonorGraph(year, weightF):
 
             # Add the edges between the two nodes and their weights
             unipartiteGraph.AddEdge(newID1, newID2)
-            
+
         nodesDone += 1
         if nodesDone % 100 == 0:
             reportTime('Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes()), start)
@@ -198,14 +198,14 @@ def getWeightScores(id1, id2, sharedCands, numDonations, totalAmount, cands, tra
 
 # Simple Jaccard Similarity
 def jaccardSimilarity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
-    score = float(len(sharedCands)) / len(cands[id1].union(cands[id2])) 
+    score = float(len(sharedCands)) / len(cands[id1].union(cands[id2]))
     return 'jaccard', score
 
 # Jaccard Similarity using the intersection of the fraction of total wealth donated to the same candidates:
 def jaccardSimilarity2(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
-    donationIntersectionAmount = sum([ min(amounts[id1][cand], amounts[id2][cand]) for cand in sharedCands ])
+    donationIntersectionAmount = sum([min(amounts[id1][cand], amounts[id2][cand]) for cand in sharedCands])
     denom = (totalAmount[id1] + totalAmount[id2])
-    if (denom == 0): 
+    if (denom == 0):
         return 'jaccard2', 0.0
     return 'jaccard2', float(donationIntersectionAmount) / denom
 
@@ -218,24 +218,24 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
 
 if __name__ == '__main__':
     start = time.time()
-    for year in range(1980, 1996, 2):
+    for year in range(1980, 1982, 2):
 
         graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
 
         # Save the SNAP graph:
-        outfile = '../Data/Unipartite-Graphs/%d.graph' % year
+        outfile = 'Data/Unipartite-Graphs/%d.graph' % year
         FOut = snap.TFOut(outfile)
         graph.Save(FOut)
         FOut.Flush()
-        
+
         # Save the weight matrices:
-        matrixPrefix = '../Data/Unipartite-Matrix/%d' % year
+        matrixPrefix = 'Data/Unipartite-Matrix/%d' % year
         pickler.save(wmat1, matrixPrefix + '.jaccard')
         pickler.save(wmat2, matrixPrefix + '.jaccard2')
         pickler.save(wmat3, matrixPrefix + '.affinity')
 
         # Save the bipartite-unipartite corresponding node ID dictionaries:
-        mappingPrefix = '../Data/Unipartite-NodeMappings/%d' % year
+        mappingPrefix = 'Data/Unipartite-NodeMappings/%d' % year
         pickler.save(newToOld, mappingPrefix + '.newToOld')
         pickler.save(oldToNew, mappingPrefix + '.oldToNew')
 
