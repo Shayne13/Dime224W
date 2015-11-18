@@ -177,7 +177,7 @@ def addContributorFromTransaction(graph, transaction, cnodeid):
 # Add a new, stripped-down recipient node usng info from a trnasaction
 def addRecipientFromTransaction(graph, transaction):
     rnodeid = graph.AddNode()
-    graph.AddIntAttrDatN(rnodeid, 'IsRecip', 1)
+    graph.AddIntAttrDatN(rnodeid, 1, 'IsRecip')
     graph.AddIntAttrDatN(rnodeid, 0, 'IsFullNode')
 
     for attrib in set(transactionIndices).intersection(set(recipientIndices)):
@@ -208,7 +208,7 @@ def getRelevantTransactions(graph, cur, contribMapping, recipientMapping):
         cnodeid = contribMapping[cid]
         if graph.GetIntAttrDatN(cnodeid, 'IsFullNode') == 0:
             addContributorFromTransaction(graph, transaction, cnodeid)
-        
+
         # If the year/rid/seat didn't appear in the Recipients table, add a
         # stripped down version of its node to the graph
         if year not in recipientMapping:
@@ -238,7 +238,7 @@ def createAndSaveGraph(year):
     G = snap.TNEANet.New()
 
     # Open the SQL connection and fill in the nodes and edges
-    infile = '../Data/DBs/%d.db' % year
+    infile = 'Data/DBs/%d.db' % year
     con = lite.connect(infile)
     with con:
         cur = con.cursor()
@@ -247,19 +247,19 @@ def createAndSaveGraph(year):
         edgeMapping = getRelevantTransactions(G, cur, contribMapping, recipMapping)
 
     # Save the graph to a file in Data/Bipartite-Graphs
-    outfile = '../Data/Bipartite-Graphs/%d.graph' % year
+    outfile = 'Data/Bipartite-Graphs/%d.graph' % year
     FOut = snap.TFOut(outfile)
     G.Save(FOut)
     FOut.Flush()
 
     # Save the edge, contributor, and recipient mappings to files in Data/Mappings
-    mapPrefix = '../Data/Mappings/%d' % year
+    mapPrefix = 'Data/Mappings/%d' % year
     pickler.save(contribMapping, mapPrefix + '.contribs')
     pickler.save(recipMapping, mapPrefix + '.recips')
     pickler.save(edgeMapping, mapPrefix + '.edges')
 
 if __name__ == '__main__':
-    for year in range(1980, 1996, 2):
+    for year in range(1980, 1982, 2):
         print 'Creating graph for %d' % year
         start = time.time()
         createAndSaveGraph(year)
