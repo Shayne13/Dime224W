@@ -60,15 +60,15 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     print '1. Finished extracting surface features after: %d' % (time.time() - start)
     
     # Average weight of edges:
-    weightSums = adjMat.sum(axis=1)
-    rows, cols = adjMat.nonzero()
-    avgWeightDenoms = [0.0] * unipartiteGraph.GetNodes()
-    for r in rows:
-        avgWeightDenoms[r] += 1.0
-    avgWeights = weightSums / avgWeightDenoms
-    zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
-    print zeros
-    avgWeights[zeros] = 1 / len(avgWeights)
+    # weightSums = adjMat.sum(axis=1)
+    # rows, cols = adjMat.nonzero()
+    # avgWeightDenoms = [0.0] * unipartiteGraph.GetNodes()
+    # for r in rows:
+    #     avgWeightDenoms[r] += 1.0
+    # avgWeights = weightSums / avgWeightDenoms
+    # zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
+    # print zeros
+    # avgWeights[zeros] = 1 / len(avgWeights)
 
     print '2. Finished computing average weights after: %d' % (time.time() - start)
 
@@ -89,18 +89,18 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     print '5. Finished computing eigenvectors after: %d' % (time.time() - start)
     
     # Pagerank:
-    pageRanks = snap.TIntFltH()
-    snap.GetPageRank(unipartiteGraph, pageRanks)
+    # pageRanks = snap.TIntFltH()
+    # snap.GetPageRank(unipartiteGraph, pageRanks)
     
     print '6. Finished computing pagerank after: %d' % (time.time() - start)
     
     # combine the graph wide features with the existing surface features:
     for nid in features:
-        features[nid].append(avgWeights[nid])
+        # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
         # features[nid].append(NIdCCfH[nid])
         features[nid].append(eigenVecs[nid])
-        features[nid].append(pageRanks[nid])
+        # features[nid].append(pageRanks[nid])
         
     print 'Finally finished aggregating features into one unipartite vector after: %d' % (time.time() - start)
         
