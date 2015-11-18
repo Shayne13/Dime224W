@@ -30,6 +30,7 @@
 
 * year INTEGER,                // The election cycle this particular campaign was for
 * rid TEXT,                    // A unique ID assigned to each recipient that lasts across cycles and campaigns
+* cid INTEGER,                 // A unique ID assigned to each contributor that lasts across cycles and campaigns
 * party INTEGER,               // 1 if Dem, 2 if GOP, 3 if other (indepedent, 3rd party, whatever)
 * seat TEXT,                   // The office being sought (e.g. presidency, US Senate, State House)
 * district VARCHAR(8),         // A code for the candidate's district

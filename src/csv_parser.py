@@ -5,14 +5,14 @@ import sys, csv, re, os, time
 import sqlite3 as sql
 from itertools import chain
 
-csv_dir = 'Data/CSVs/'
-db_dir = 'Data/DBs/'
+csv_dir = '../Data/CSVs/'
+db_dir = '../Data/DBs/'
 csv_1982 = csv_dir + 'contribDB_1982.csv'
 recipient_path = csv_dir + 'candidate_cfscores_st_fed_1979_2012.csv'
 contributors_path = csv_dir + 'contributor_cfscores_st_fed_1979_2012.csv'
 
 def loadDBForCycle(cycle):
-    csvName = 'Data/CSVs/contribDB_%d.csv' % cycle
+    csvName = csv_dir + 'contribDB_%d.csv' % cycle
     dbName = db_dir + str(cycle) + '.db'
     loadTransactionFile(dbName, csvName, cycle)
 
@@ -27,15 +27,16 @@ def loadTransactionFile(dbName, csvName, year):
         reader = csv.reader(f)
         reader.next() # skip column headers
         for i, block in enumerate(generateChunk(reader, extractors, transforms)):
-            commitTransBlock(dbName, block)
+            newBlock = filterTransactions(block)
+            commitTransBlock(dbName, newBlock)
 
     print 'Time taken: ' + str(time.time() - start)
 
 def loadRecipients(dbNames, filepath):
     print '------------- Loading Recipients Tables -------------'
     start = time.time()
-    extractors = [0, 7, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
-    transforms = [int, str, party, str, str, incumb, float, float, int, gender, safeInt, winner, safeFloat, safeFloat, safeFloat, candStatus, int, candOrComm]
+    extractors = [0, 7, 8, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
+    transforms = [int, str, safeInt, party, str, str, incumb, float, float, int, gender, safeInt, winner, safeFloat, safeFloat, safeFloat, candStatus, int, candOrComm]
     observedKeys = set()
 
     for db in dbNames:
@@ -45,7 +46,7 @@ def loadRecipients(dbNames, filepath):
         reader = csv.reader(f)
         reader.next() # skip column headers
         for i, block in enumerate(generateChunk(reader, extractors, transforms)):
-            newBlock = extractDuplicateRecipients(block, observedKeys)
+            newBlock = filterRecipients(block, observedKeys)
             for db in dbNames:
                 commitRecipBlock(db, newBlock)
 
@@ -69,12 +70,25 @@ def loadContributors(dbNames, filepath):
 
 # Ensures that all recipients have unique (year, rid, seat) keys
 # and that only the first row is taken.
-def extractDuplicateRecipients(block, observedKeys):
+def filterRecipients(block, observedKeys):
     newBlock = []
     for l in block:
-        if ((l[0], l[1], l[3]) not in observedKeys):
+        if ((l[0], l[1], l[4]) not in observedKeys):
             newBlock.append(l)
-            observedKeys.add((l[0], l[1], l[3]))
+            observedKeys.add((l[0], l[1], l[4]))
+
+    return newBlock
+
+# Filters out transactions of $0 and negative transactions that are not of
+# type 22Y.
+def filterTransactions(block):
+    newBlock = []
+    for l in block:
+        # If amount is 0, or (amount is negative, but type is not 22Y):
+        if (l[3] == 0 or (l[3] < 0 and l[2] != '22Y')):
+            continue
+        newBlock.append(l)
+
     return newBlock
 
 # ----- Column Transformation Functions -----
@@ -198,7 +212,7 @@ def commitRecipBlock(dbName, block):
         con = sql.connect(dbName)
         cur = con.cursor()
 
-        cur.executemany("INSERT INTO Recipients VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", block)
+        cur.executemany("INSERT INTO Recipients VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", block)
 
         con.commit()
 
@@ -316,6 +330,7 @@ def initRecipientTable(dbName):
             CREATE TABLE Recipients(
               year INTEGER,
               rid TEXT,
+              cid INTEGER,
               party INTEGER,
               seat TEXT,
               district VARCHAR(8),
@@ -348,7 +363,7 @@ def initRecipientTable(dbName):
 if __name__ == '__main__':
     dbNames = [db_dir + str(cycle) + '.db' for cycle in range(1980, 2014, 2)]
     loadRecipients(dbNames, recipient_path)
-    loadContributors(dbNames, contributors_path)
+    # loadContributors(dbNames, contributors_path)
     for cycle in range(1980, 1996, 2):
         loadDBForCycle(cycle)
 

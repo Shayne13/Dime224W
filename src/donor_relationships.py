@@ -1,5 +1,9 @@
+#!/usr/bin/python
+
 import snap, time
 from collections import defaultdict
+from util import pickler
+import scipy.sparse as sp
 
 # Given an election cycle and a weighting function, creates a unipartite
 # donor-donor graph. The weighting function must take in the following
@@ -15,73 +19,92 @@ def createDonorDonorGraph(year, weightF):
     start = time.time()
 
     # Load the old bipartite graph graph
-    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('Data/Bipartite-Graphs/%d.graph' % year))
-
-    # Create the new donor-donor graph
-    unipartiteGraph = snap.TNEANet.New()
+    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
 
     # Load the info about each donor and their recipients
-    numDonations, totalAmount, cands, transactions, amounts = \
-        getDonorInfos(bipartiteGraph)
-    print 'Got info about donor nodes'
-    print 'Current time elapsed: %f' % (time.time() - start)
+    numDonations, totalAmount, cands, transactions, amounts = getDonorInfos(bipartiteGraph)
+    reportTime('Got info about donor nodes', start)
 
+    # Create initial unipartite graph with just nodes and node attributes
+    unipartiteGraph, oldToNew, newToOld = cloneBipartiteNodes(bipartiteGraph, cands)
+    reportTime('Finished cloning nodes', start)
 
-    # Add each donor node from the old graph to the new one
-    for node in bipartiteGraph.Nodes():
-        if bipartiteGraph.GetIntAttrDatN(node.GetId(), 'IsRecip') == 1:
-            continue
-        cloneNode(bipartiteGraph, unipartiteGraph, node.GetId())
-
-    print 'Finished cloning nodes'
-    print 'Current time elapsed: %f' % (time.time() - start)
+    jaccardData = []
+    jaccard2Data = []
+    affinityData = []
+    r = []
+    c = []
 
     # Add the weighted edges for every relevant pair of donor nodes
     nodesDone = 0
-    for node1 in unipartiteGraph.Nodes():
-        id1 = node1.GetId()
-        for node2 in unipartiteGraph.Nodes():
-            id2 = node2.GetId()
-            if id1 >= id2:
-                continue
 
-            # Get the set of all the candidates both donors donated to, and
-            # move on if they have none in common
-            sharedCands = cands[id1].intersection(cands[id2])
-            if not sharedCands:
-                continue
+    for i, newID1 in enumerate(newToOld.keys()):
+        oldID1 = newToOld[newID1]
+        for newID2 in newToOld.keys()[i + 1:]:
+            oldID2 = newToOld[newID2]
 
-            # Get the number of transactions and the total amount given to shared
-            # candidates
-            sharedTransactions = sharedAmount = 0
-            for cand in sharedCands:
-                sharedTransactions += transactions[id1][cand] + transactions[id2][cand]
-                sharedAmount += amounts[id1][cand] + amounts[id2][cand]
+            sharedCands = cands[oldID1].intersection(cands[oldID2])
+            if not sharedCands: continue
 
             # Calculate the weight
-            weight = weightF(
-                len(sharedCands),
-                sharedTransactions,
-                sharedAmount,
-                len(cands[id1].union(cands[id2])),
-                numDonations[id1] + numDonations[id2],
-                totalAmount[id1] + totalAmount[id2]
+            weights = weightF(
+                oldID1,
+                oldID2,
+                sharedCands,
+                numDonations, 
+                totalAmount, 
+                cands, 
+                transactions, 
+                amounts
             )
 
+            r.append(newID1)
+            r.append(newID2)
+            c.append(newID2)
+            c.append(newID1)
+            jaccardData.append(weights['jaccard'])
+            jaccardData.append(weights['jaccard'])
+            jaccard2Data.append(weights['jaccard2'])
+            jaccard2Data.append(weights['jaccard2'])
+            affinityData.append(weights['affinity'])
+            affinityData.append(weights['affinity'])
+
             # Add the edges between the two nodes and their weights
-            e1 = unipartiteGraph.AddEdge(id1, id2)
-            e2 = unipartiteGraph.AddEdge(id2, id1)
-            unipartiteGraph.AddFltAttrDatE(e1, weight, 'weight')
-            unipartiteGraph.AddFltAttrDatE(e2, weight, 'weight')
+            unipartiteGraph.AddEdge(newID1, newID2)
+            
         nodesDone += 1
         if nodesDone % 100 == 0:
-            print 'Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes())
-            print 'Current time elapsed: %f' % (time.time() - start)
+            reportTime('Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes()), start)
 
-    print 'Total time taken: %f' % (time.time() - start)
+    N = len(newToOld)
+    jaccardAdjMat = sp.coo_matrix((jaccardData, (r, c)), shape = (N, N))
+    jaccard2AdjMat = sp.coo_matrix((jaccard2Data, (r, c)), shape = (N, N))
+    affinityAdjMat = sp.coo_matrix((affinityData, (r, c)), shape = (N, N))
 
-    return unipartiteGraph
+    reportTime('Unipartite Graph complete.', start)
+    return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat
 
+# Takes in the bipartite graph and generates the initial unipartiteGraph with just nodes
+# and node attributes.
+def cloneBipartiteNodes(bipartiteGraph, cands, threshold = 1):
+    # Create the new donor-donor graph
+    unipartiteGraph = snap.TUNGraph.New()
+    oldToNew = {}
+    newToOld = {}
+
+    # Add each donor node from the old graph to the new one
+    for node in bipartiteGraph.Nodes():
+        oldID = node.GetId()
+        if bipartiteGraph.GetIntAttrDatN(oldID, 'IsRecip') == 1:
+            continue
+        if len(cands[oldID]) <= threshold:
+            continue
+
+        newID = unipartiteGraph.AddNode()
+        oldToNew[oldID] = newID
+        newToOld[newID] = oldID
+
+    return unipartiteGraph, oldToNew, newToOld
 
 # Given a bipartite donor-candidate graph, returns 5 relevant dictionaries
 # from cnodeids to various donation metrics. These are, in order,
@@ -150,3 +173,92 @@ def cloneNode(graph1, graph2, nodeid):
         graph2.AddFltAttrDatN(nodeid, fltVals[i], fltNames[i])
     for i in range(strNames.Len()):
         graph2.AddStrAttrDatN(nodeid, strVals[i], strNames[i])
+
+# Helper function to report the time taken.
+def reportTime(event, start):
+    print event
+    print 'Time elapsed: %f' % (time.time() - start)
+
+
+# ----- WEIGHTING FUNCTIONS -----
+
+# The weighting function must take in the 2 cnodeids, their shared candidates
+# and the following 5 dictionary parameters, each from cnodeid to:
+# 1. The total number of donations that donor made
+# 2. The total amount that donor donated
+# 3. The set of rnodeids that donor gave to
+# 4. A dictionary showing how many donations the donor made to each rnodeid
+# 5. A dictionary showing how much the donor gave to each rnodeid
+
+def getWeightScores(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
+    weights = {}
+
+    n1, s1 = jaccardSimilarity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
+    n2, s2 = jaccardSimilarity2(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
+    n3, s3 = affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
+
+    weights[n1] = s1
+    weights[n2] = s2
+    weights[n3] = s3
+
+    return weights
+
+# Simple Jaccard Similarity
+def jaccardSimilarity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
+    score = float(len(sharedCands)) / len(cands[id1].union(cands[id2])) 
+    return 'jaccard', score
+
+# Jaccard Similarity using the intersection of the fraction of total wealth donated to the same candidates:
+def jaccardSimilarity2(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
+    donationIntersectionAmount = sum([ min(amounts[id1][cand], amounts[id2][cand]) for cand in sharedCands ])
+    denom = (totalAmount[id1] + totalAmount[id2])
+    if (denom == 0): 
+        return 'jaccard2', 0.0
+    return 'jaccard2', float(donationIntersectionAmount) / denom
+
+# See: https://stats.stackexchange.com/questions/142132/is-this-a-valid-method-for-unipartite-projection-of-a-bipartite-graph
+def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
+    score = ((len(sharedCands) * len(cands)) / (len(cands[id1]) + len(cands[id2]))) / 1.0
+    return 'affinity', score
+
+# ----- MAIN: -----
+
+if __name__ == '__main__':
+    start = time.time()
+    for year in range(1980, 1996, 2):
+
+        graph, wmat1, wmat2, wmat3 = createDonorDonorGraph(year, getWeightScores)
+
+        # Save the SNAP graph:
+        outfile = '../Data/Unipartite-Graphs/%d.graph' % year
+        FOut = snap.TFOut(outfile)
+        graph.Save(FOut)
+        FOut.Flush()
+        
+        # Save the weight matrices:
+        matrixPrefix = '../Data/Unipartite-Matrix/%d' % year
+        pickler.save(wmat1, matrixPrefix + '.jaccard')
+        pickler.save(wmat2, matrixPrefix + '.jaccard2')
+        pickler.save(wmat3, matrixPrefix + '.affinity')
+
+    print 'Created all unipartite graphs in %d' % (time.time() - start)
+
+
+
+# ------ OLD CODE: ------
+
+            # weight = weightF(
+            #     len(sharedCands),
+            #     sharedTransactions,
+            #     sharedAmount,
+            #     len(cands[id1].union(cands[id2])),
+            #     numDonations[id1] + numDonations[id2],
+            #     totalAmount[id1] + totalAmount[id2],
+            # )
+
+            # Get the number of transactions and the total amount given to shared
+            # candidates
+            # sharedTransactions = sharedAmount = 0
+            # for cand in sharedCands:
+            #     sharedTransactions += transactions[id1][cand] + transactions[id2][cand]
+            #     sharedAmount += amounts[id1][cand] + amounts[id2][cand]

@@ -23,22 +23,23 @@ stringAttribsEdge = set(['tid', 'ttid', 'date', 'rid', 'district', 'seat'])
 recipientIndices = {
     'year': 0,
     'rid': 1,
-    'party': 2,
-    'seat': 3,
-    'district': 4,
-    'incumb': 5,
-    'cfs': 6,
-    'cfsdyn': 7,
-    'numgivers': 8,
-    'gender': 9,
-    'didprimary': 10,
-    'winner': 11,
-    'partisanship': 12,
-    'indistrict': 13,
-    'instate': 14,
-    'candstatus': 15,
-    'fecyear': 16,
-    'candorcomm': 17,
+    'cid': 2,
+    'party': 3,
+    'seat': 4,
+    'district': 5,
+    'incumb': 6,
+    'cfs': 7,
+    'cfsdyn': 8,
+    'numgivers': 9,
+    'gender': 10,
+    'didprimary': 11,
+    'winner': 12,
+    'partisanship': 13,
+    'indistrict': 14,
+    'instate': 15,
+    'candstatus': 16,
+    'fecyear': 17,
+    'candorcomm': 18,
 }
 contributorIndices ={'cid': 0, 'indiv': 1, 'state': 2, 'cfscore': 3}
 transactionIndices = {
@@ -92,26 +93,34 @@ def addEdgeAttrib(graph, edgeID, val, attrib):
 
 def getRelevantDonors(graph, cur):
     # Query the DB for all the donors with transactions during this cycle
-    query = '''
+    getCidsQuery = 'SELECT DISTINCT cid FROM Transactions GROUP BY cid HAVING SUM(amount) > 0'
+    getContributorInfo = '''
         SELECT *
         FROM Contributors
         WHERE cid IN (
-            SELECT cid FROM Transactions
+            SELECT cid FROM Transactions GROUP BY cid HAVING SUM(amount) > 0
         )
     '''
-    cur.execute(query)
-    donors = cur.fetchall()
+    cur.execute(getCidsQuery)
+    cids = cur.fetchall()
 
     contributorMapping = {}
+
+    for row in cids:
+        cid = row[0]
+        cnodeid = graph.AddNode()
+        graph.AddIntAttrDatN(cnodeid, 0, 'IsRecip')
+        graph.AddIntAttrDatN(cnodeid, 0, 'IsFullNode')
+        contributorMapping[cid] = cnodeid
+
+    cur.execute(getContributorInfo)
+    donors = cur.fetchall()
 
     for donor in donors:
         # Add the contributor node to the graph and note that it is not a recipient
         cid = donor[contributorIndices['cid']]
-        cnodeid = graph.AddNode()
-        graph.AddIntAttrDatN(cnodeid, 0, 'IsRecip')
+        cnodeid = contributorMapping[cid]
         graph.AddIntAttrDatN(cnodeid, 1, 'IsFullNode')
-
-        contributorMapping[cid] = cnodeid
 
         # Add each node attribute to the node accordingly
         for attribute, index in contributorIndices.iteritems():
@@ -123,7 +132,7 @@ def getRelevantDonors(graph, cur):
 def getRelevantRecipients(graph, cur):
     # Query the DB for all the recipients with transactions during this cycle
     query = '''
-        SELECT r.rid, r.year, r.party, r.seat, r.district, r.incumb, r.cfs,
+        SELECT r.rid, r.year, r.cid, r.party, r.seat, r.district, r.incumb, r.cfs,
                r.cfsdyn, r.numgivers, r.gender, r.didprimary, r.winner,
                r.partisanship, r.indistrict, r.instate, r.candstatus, r.fecyear,
                r.candorcomm
@@ -160,16 +169,10 @@ def getRelevantRecipients(graph, cur):
     return recipientMapping
 
 # Add a new, stripped-down contributor node usng info from a transaction
-def addContributorFromTransaction(graph, transaction):
-    cnodeid = graph.AddNode()
-    graph.AddIntAttrDatN(cnodeid, 'IsRecip', 0)
-    graph.AddIntAttrDatN(cnodeid, 0, 'IsFullNode')
-
+def addContributorFromTransaction(graph, transaction, cnodeid):
     for attrib in set(transactionIndices).intersection(set(contributorIndices)):
         val = transaction[transactionIndices[attrib]]
         addNodeAttrib(graph, cnodeid, val, attrib)
-
-    return cnodeid
 
 # Add a new, stripped-down recipient node usng info from a trnasaction
 def addRecipientFromTransaction(graph, transaction):
@@ -201,10 +204,11 @@ def getRelevantTransactions(graph, cur, contribMapping, recipientMapping):
         # If the cid didn't appear in the Contributors table, add a
         # stripped down version of its node to the graph
         if cid not in contribMapping:
-            contribMapping[cid] = \
-                addContributorFromTransaction(graph, transaction)
+            continue
         cnodeid = contribMapping[cid]
-
+        if graph.GetIntAttrDatN(cnodeid, 'IsFullNode') == 0:
+            addContributorFromTransaction(graph, transaction, cnodeid)
+        
         # If the year/rid/seat didn't appear in the Recipients table, add a
         # stripped down version of its node to the graph
         if year not in recipientMapping:
@@ -234,7 +238,7 @@ def createAndSaveGraph(year):
     G = snap.TNEANet.New()
 
     # Open the SQL connection and fill in the nodes and edges
-    infile = 'Data/DBs/%d.db' % year
+    infile = '../Data/DBs/%d.db' % year
     con = lite.connect(infile)
     with con:
         cur = con.cursor()
@@ -243,13 +247,13 @@ def createAndSaveGraph(year):
         edgeMapping = getRelevantTransactions(G, cur, contribMapping, recipMapping)
 
     # Save the graph to a file in Data/Bipartite-Graphs
-    outfile = 'Data/Bipartite-Graphs/%d.graph' % year
+    outfile = '../Data/Bipartite-Graphs/%d.graph' % year
     FOut = snap.TFOut(outfile)
     G.Save(FOut)
     FOut.Flush()
 
     # Save the edge, contributor, and recipient mappings to files in Data/Mappings
-    mapPrefix = 'Data/Mappings/%d' % year
+    mapPrefix = '../Data/Mappings/%d' % year
     pickler.save(contribMapping, mapPrefix + '.contribs')
     pickler.save(recipMapping, mapPrefix + '.recips')
     pickler.save(edgeMapping, mapPrefix + '.edges')
