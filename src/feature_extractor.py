@@ -7,29 +7,21 @@ from collections import defaultdict
 import numpy as np
 
 
-def generateFeatures(year):
-    
-    print 'Beginning feature extraction for %d:' % year
+def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
+   
     start = time.time()
     
-    unipartiteGraph = snap.TUNGraph.Load(snap.TFIn('../Data/Unipartite-Graphs/%d.graph' % year))
-    weightMatrix = pickler.load('../Data/Unipartite-Matrix/%d.jaccard' % year)
-    weightMatrix = weightMatrix.tocsc()
-    newToOldIDs = pickler.load('../Data/Unipartite-NodeMappings/%d.newToOld' % year)
-    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
-    print 'Finished loading input graphs/matrices. Time from start of cycle: %d' % (time.time() - start)
-    
     bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
-    print 'Finished extracting bipartite features. Time from start of cycle: %d' % (time.time() - start)
+    print 'Finished extracting bipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
     
-    unipartiteFeatures = convertNewToOldIDs(extractUnipartiteFeatures(unipartiteGraph, weightMatrix), newToOldIDs)
-    print 'Finished extracting unipartite features. Time from start of cycle: %d' % (time.time() - start)
+    unipartiteFeatures = convertNewToOldIDs(extractUnipartiteFeatures(unipartiteGraph, adjMatrix), newToOldIDs)
+    print 'Finished extracting unipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
     
     # append unipartite features to bipartite features for each node, returning combined feature dictionary:
     features = {}
     for oldNID in bipartiteGraph:
         features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
-    print 'Finished combining unipartite and bipartite features. Time from start of cycle: %d' % (time.time() - start)
+    print 'Finished combining unipartite and bipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
     
     return features
 
@@ -64,34 +56,45 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     features = defaultdict(list)
     getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
     
-    print 'Finished extracting surface features after: %d' % (time.time() - start)
+    print '1. Finished extracting surface features after: %d' % (time.time() - start)
     
+    # Average weight of edges:
+    weightSums = adjMat.sum(axis=1)
+    rows, cols = adjMat.nonzero()
+    avgWeightDenoms = [0] * unipartiteGraph.GetNodes()
+    for r in rows:
+        avgWeightDenoms[r] += 1
+    avgWeights = weightSums / avgWeightDenoms
+
+    print '2. Finished computing average weights after: %d' % (time.time() - start)
+
     # Size of connected component:
     cnctComponents = calcCnctComponents(unipartiteGraph)
     
-    print 'Finished computing connected components after: %d' % (time.time() - start)
+    print '3. Finished computing connected components after: %d' % (time.time() - start)
     
     # Node clustering coefficients:
-    NIdCCfH = snap.TIntFltH()
-    snap.GetNodeClustCf(unipartiteGraph, NIdCCfH)
+    # NIdCCfH = snap.TIntFltH()
+    # snap.GetNodeClustCf(unipartiteGraph, NIdCCfH)
     
-    print 'Finished computing clustering coefficients after: %d' % (time.time() - start)
+    # print '4. Finished computing clustering coefficients after: %d' % (time.time() - start)
     
     # Eigenvectors:
     eigenVal, eigenVecs = sp.linalg.eigs(adjMat, k=1)
     
-    print 'Finished computing eigenvectors after: %d' % (time.time() - start)
+    print '5. Finished computing eigenvectors after: %d' % (time.time() - start)
     
     # Pagerank:
     pageRanks = snap.TIntFltH()
     snap.GetPageRank(unipartiteGraph, pageRanks)
     
-    print 'Finished computing pagerank after: %d' % (time.time() - start)
+    print '6. Finished computing pagerank after: %d' % (time.time() - start)
     
     # combine the graph wide features with the existing surface features:
     for nid in features:
+    	features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
-        features[nid].append(NIdCCfH[nid])
+        # features[nid].append(NIdCCfH[nid])
         features[nid].append(eigenVecs[nid])
         features[nid].append(pageRanks[nid])
         
@@ -109,12 +112,8 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
         # Node degree:
         features[nid].append(node.GetDeg())
         
-        # Average weight of edges:
-        avgWeight = (sum(adjMat[:,nid]) / np.sum([ 1.0 for j in adjMat[:,nid] if j > 0.0]))[0,0]
-        features[nid].append(avgWeight)
-        
         # Nodes at hop:
-        nodesAtHop = snap.TIntV()
+        # nodesAtHop = snap.TIntV()
         #features[nid].append(snap.GetNodesAtHop(graph, nid, 2, nodesAtHop, False))
 
 
@@ -189,9 +188,26 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
 
 if __name__ == '__main__':
     for year in range(1980, 1990, 2):
+
+    	print 'Beginning feature extraction for cycle %d:' % year
 		start = time.time()
-		features = generateFeatures(year)
-		pickler.save(features, '../Data/Features/%djaccard' % year + '.features')
+
+	    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
+	    unipartiteGraph = snap.TUNGraph.Load(snap.TFIn('../Data/Unipartite-Graphs/%d.graph' % year))
+	    newToOldIDs = pickler.load('../Data/Unipartite-NodeMappings/%d.newToOld' % year)
+		print 'Finished loading input graphs/matrices for cycle. Time taken: %d' % (time.time() - start)
+
+		for weightF in ['jaccard', 'affinity', 'jaccard2']:
+			print 'Starting feature extraction with weight function: %s' % weightF
+
+		    adjMatrix = pickler.load('../Data/Unipartite-Matrix/%d.%s' % (year, weightF))
+		    adjMatrix = adjMatrix.tocsc()
+
+			features = generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix)
+			pickler.save(features, '../Data/Features/%d%s.features' % (year, weightF))
+
+			print 'Finished feature extraction for weight function: %s' % weightF
+		
 		print 'Total time taken for this cycle: %d' % (time.time() - start)
 
 
