@@ -2,6 +2,7 @@
 
 import sys, time, snap
 import scipy.sparse as sp
+import scipy.sparse.linalg as linalg
 from util import pickler
 from collections import defaultdict
 import numpy as np
@@ -19,7 +20,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     
     # append unipartite features to bipartite features for each node, returning combined feature dictionary:
     features = {}
-    for oldNID in bipartiteGraph:
+    for oldNID in unipartiteFeatures:
         features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
     print 'Finished combining unipartite and bipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
     
@@ -61,10 +62,13 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # Average weight of edges:
     weightSums = adjMat.sum(axis=1)
     rows, cols = adjMat.nonzero()
-    avgWeightDenoms = [0] * unipartiteGraph.GetNodes()
+    avgWeightDenoms = [0.0] * unipartiteGraph.GetNodes()
     for r in rows:
-        avgWeightDenoms[r] += 1
+        avgWeightDenoms[r] += 1.0
     avgWeights = weightSums / avgWeightDenoms
+    zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
+    print zeros
+    avgWeights[zeros] = 1 / len(avgWeights)
 
     print '2. Finished computing average weights after: %d' % (time.time() - start)
 
@@ -92,7 +96,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     
     # combine the graph wide features with the existing surface features:
     for nid in features:
-    	features[nid].append(avgWeights[nid])
+        features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
         # features[nid].append(NIdCCfH[nid])
         features[nid].append(eigenVecs[nid])
@@ -189,26 +193,26 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
 if __name__ == '__main__':
     for year in range(1980, 1990, 2):
 
-    	print 'Beginning feature extraction for cycle %d:' % year
-		start = time.time()
+        print 'Starting feature extraction for cycle %d: ' % year
+        start = time.time()
 
-	    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
-	    unipartiteGraph = snap.TUNGraph.Load(snap.TFIn('../Data/Unipartite-Graphs/%d.graph' % year))
-	    newToOldIDs = pickler.load('../Data/Unipartite-NodeMappings/%d.newToOld' % year)
-		print 'Finished loading input graphs/matrices for cycle. Time taken: %d' % (time.time() - start)
+        bipartiteGraph = snap.TNEANet.Load(snap.TFIn('../Data/Bipartite-Graphs/%d.graph' % year))
+        unipartiteGraph = snap.TUNGraph.Load(snap.TFIn('../Data/Unipartite-Graphs/%d.graph' % year))
+        newToOldIDs = pickler.load('../Data/Unipartite-NodeMappings/%d.newToOld' % year)
+        print 'Finished loading input graphs/matrices for cycle. Time taken: %d' % (time.time() - start)
 
-		for weightF in ['jaccard', 'affinity', 'jaccard2']:
-			print 'Starting feature extraction with weight function: %s' % weightF
+        for weightF in ['jaccard', 'affinity', 'jaccard2']:
+            print 'Starting feature extraction with weight function: %s' % weightF
 
-		    adjMatrix = pickler.load('../Data/Unipartite-Matrix/%d.%s' % (year, weightF))
-		    adjMatrix = adjMatrix.tocsc()
+            adjMatrix = pickler.load('../Data/Unipartite-Matrix/%d.%s' % (year, weightF))
+            adjMatrix = adjMatrix.tocsc()
 
-			features = generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix)
-			pickler.save(features, '../Data/Features/%d%s.features' % (year, weightF))
+            features = generateFeatures(year, bipartiteGraph, unipartiteGraph, newToOldIDs, adjMatrix)
+            pickler.save(features, '../Data/Features/%d%s.features' % (year, weightF))
 
-			print 'Finished feature extraction for weight function: %s' % weightF
-		
-		print 'Total time taken for this cycle: %d' % (time.time() - start)
+            print 'Finished feature extraction for weight function: %s' % weightF
+        
+        print 'Total time taken for this cycle: %d' % (time.time() - start)
 
 
 
