@@ -99,7 +99,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
         # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
         # features[nid].append(NIdCCfH[nid])
-        features[nid].append(eigenVecs[nid])
+        features[nid].append(eigenVecs[nid, 0])
         # features[nid].append(pageRanks[nid])
 
     print 'Finally finished aggregating features into one unipartite vector after: %d' % (time.time() - start)

@@ -40,9 +40,9 @@ def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegress
     print 'Time elapsed: %f' % (time.time() - start)
 
     avgRSq = sum(rsquareds) / len(rsquareds)
-    with open('Data/Results/%d%s.rsquareds', 'w') as f:
+    with open('Data/Results/%d%s.rsquareds' % (year, weighting), 'w') as f:
         f.write('K-fold validation results:\n')
-        f.write('Average: %f\n\n' % r)
+        f.write('Average: %f\n\n' % avgRSq)
         for i, r in enumerate(rsquareds):
             f.write('%d: %f\n' % (i, r))
 
@@ -111,6 +111,8 @@ def getRecipFeatures(graph, donorFeatures):
     #        getAmountPercentages(graph)
     #print 'Got amount percentages.'
 
+    good = 0
+    bad = 0
     for rnodeid in totalReceipts:
         if graph.GetIntAttrDatN(rnodeid, 'IsRecip') != 1:
             continue
@@ -118,20 +120,25 @@ def getRecipFeatures(graph, donorFeatures):
         #for donor in receiptsFromDonor[rnodeid]:
         #    donorFeatures[donor].append(donationsToCand[rnodeid][donor])
 
-        if totalReceipts[rnodeid] != 0:
+        if validWeights(donorFeatures, receiptsFromDonor[rnodeid]):
             recipFeatures[rnodeid] = processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
+            good += 1
+        else:
+            bad += 1
             #recipFeatures[rnodeid] = np.append(
             #    processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid]),
             #    getRecipSpecificFeatures(graph, rnodeid)
             #)
-        else:
-            print 'Bad node %d' % rnodeid
 
         #for donor in receiptsFromDonor[rnodeid]:
         #    donorFeatures[donor].pop()
 
+    print 'Good: %d; Bad: %d' % (good, bad)
     return recipFeatures
 
+def validWeights(donorFeatures, weightsForDonors):
+    eligibleDonors = set(weightsForDonors.keys()) & set(donorFeatures.keys())
+    return sum(weightsForDonors[donor] for donor in eligibleDonors) > 0
 
 # Given the donor features and the weights this recipient should put on the donors
 # (proportional to the percent of the recipient's donations coming from that donor),
@@ -160,4 +167,4 @@ def getRecipSpecificFeatures(graph, rnodeid):
 if __name__ == '__main__':
     weightings = ['jaccard', 'jaccard2', 'affinity']
     for w in weightings:
-        trainAndTestModels(1980, w)
+        trainAndTestModels(1980, w, 4)
