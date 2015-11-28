@@ -12,7 +12,7 @@ def loadGraph(filename, graphType = snap.TNEANet):
 # Save a snap graph to a file
 def saveGraph(graph, filename):
     FOut = snap.TFOut(filename)
-    graph.save(FOut)
+    graph.Save(FOut)
     FOut.Flush()
 
 # Generator over all the recipient nodes in the graph
