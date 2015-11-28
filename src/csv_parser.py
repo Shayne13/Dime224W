@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 
-import sys, csv, re, os, time
+import sys, csv, re, os
 import sqlite3 as sql
 from itertools import chain
+from util.Timer import Timer
 
 csv_dir = '../Data/CSVs/'
 db_dir = '../Data/DBs/'
@@ -17,8 +18,7 @@ def loadDBForCycle(cycle):
     loadTransactionFile(dbName, csvName, cycle)
 
 def loadTransactionFile(dbName, csvName, year):
-    print 'Loading Transactions_{0} into Table:'.format(year)
-    start = time.time()
+    timing = Timer('loading Transactions_%d into table' % year)
     extractors = [0, 1, 2, 3, 4, 5, 13, 27, 28, 29, 33, 34, 36, 37]
     transforms = [int, str, str, strToFltToInt, str, strToFltToInt, indiv, str, party, candOrComm, str, str, safeFloat, safeFloat]
     initTransactionsTable(dbName)
@@ -30,11 +30,10 @@ def loadTransactionFile(dbName, csvName, year):
             newBlock = filterTransactions(block)
             commitTransBlock(dbName, newBlock)
 
-    print 'Time taken: ' + str(time.time() - start)
+    timing.finish()
 
 def loadRecipients(dbNames, filepath):
-    print '------------- Loading Recipients Tables -------------'
-    start = time.time()
+    timing = Timer('loading Recipients table')
     extractors = [0, 7, 8, 10, 12, 13, 14, 15, 16, 22, 23, 39, 46, 47, 61, 62, 63, 64, 65]
     transforms = [int, str, safeInt, party, str, str, incumb, float, float, int, gender, safeInt, winner, safeFloat, safeFloat, safeFloat, candStatus, int, candOrComm]
     observedKeys = set()
@@ -50,11 +49,10 @@ def loadRecipients(dbNames, filepath):
             for db in dbNames:
                 commitRecipBlock(db, newBlock)
 
-    print 'Time taken: ' + str(time.time() - start)
+    timing.finish()
 
 def loadContributors(dbNames, filepath):
-    print '------------- Loading Contributors Tables -------------'
-    start = time.time()
+    timing = Timer('loading Contributors table')
     extractors = [0, 1, 2, 3]
     transforms = [int, indiv, str, safeFloat]
 
@@ -66,7 +64,7 @@ def loadContributors(dbNames, filepath):
         for db in dbNames:
             commitContribBlock(db, block)
 
-    print 'Time taken: ' + str(time.time() - start)
+    timing.finish()
 
 # Ensures that all recipients have unique (year, rid, seat) keys
 # and that only the first row is taken.

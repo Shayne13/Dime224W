@@ -1,28 +1,28 @@
 #!/usr/bin/python
 
-import sys, time, snap
+import sys, snap
 import scipy.sparse as sp
 import scipy.sparse.linalg as linalg
-from util import pickler
+from util import pickler, graph_funcs
+from util.Timer import Timer
 from collections import defaultdict
 import numpy as np
 
 
 def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
-
-    start = time.time()
+    timing = Timer('generating features for %d' % year)
 
     bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
-    print '  Finished extracting bipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
+    timing.markEvent('Extracted bipartite features.')
 
     unipartiteFeatures = convertNewToOldIDs(extractUnipartiteFeatures(unipartiteGraph, adjMatrix), newToOldIDs)
-    print '  Finished extracting unipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
+    timing.markEvent('Extracted unipartite features.')
 
     # append unipartite features to bipartite features for each node, returning combined feature dictionary:
     features = {}
     for oldNID in unipartiteFeatures:
         features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
-    print '  Finished combining unipartite and bipartite features. Time from start of weight-cycle: %d' % (time.time() - start)
+    timing.finish()
 
     return features
 
@@ -52,12 +52,12 @@ def extractBipartiteFeatures(bipartiteGraph):
 
 
 def extractUnipartiteFeatures(unipartiteGraph, adjMat):
-    start = time.time()
+    timing = Timer('extracting unipartite features')
 
     features = defaultdict(list)
     getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
 
-    print '    1. Finished extracting surface features after: %d' % (time.time() - start)
+    timing.markEvent('1. Extracted surface features')
 
     # Average weight of edges:
     # weightSums = adjMat.sum(axis=1)
@@ -69,30 +69,25 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
     # print zeros
     # avgWeights[zeros] = 1 / len(avgWeights)
-
-    print '    2. Finished computing average weights after: %d' % (time.time() - start)
+    timing.markEvent('2. Computed average weights.')
 
     # Size of connected component:
     cnctComponents = calcCnctComponents(unipartiteGraph)
-
-    print '    3. Finished computing connected components after: %d' % (time.time() - start)
+    timing.markEvent('3. Computed connected components.')
 
     # Node clustering coefficients:
     # NIdCCfH = snap.TIntFltH()
     # snap.GetNodeClustCf(unipartiteGraph, NIdCCfH)
-
-    # print '4. Finished computing clustering coefficients after: %d' % (time.time() - start)
+    timing.markEvent('4. Computed clustering coefficients.')
 
     # Eigenvectors:
     eigenVal, eigenVecs = sp.linalg.eigs(adjMat, k=1)
-
-    print '    5. Finished computing eigenvectors after: %d' % (time.time() - start)
+    timing.markEvent('5. Computed eigenvectors.')
 
     # Pagerank:
     pageRanks = snap.TIntFltH()
     snap.GetPageRank(unipartiteGraph, pageRanks)
-
-    print '    6. Finished computing pagerank after: %d' % (time.time() - start)
+    timing.markEvent('6. Computed PageRank.')
 
     # combine the graph wide features with the existing surface features:
     for nid in features:
@@ -102,7 +97,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
         features[nid].append(float(eigenVecs[nid][0]))
         features[nid].append(pageRanks[nid])
 
-    print '    Finally finished aggregating features into one unipartite vector after: %d' % (time.time() - start)
+    timing.finish()
 
     return features
 
@@ -192,25 +187,20 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
 
 if __name__ == '__main__':
     for year in range(1980, 1982, 2):
+        timing = Timer('creating unipartite graph for %d' % year)
 
-        print '*************** Starting cycle: %d ***************' % year
-        start = time.time()
-
-        bipartiteGraph = snap.TNEANet.Load(snap.TFIn('Data/Bipartite-Graphs/%d.graph' % year))
-        unipartiteGraph = snap.TUNGraph.Load(snap.TFIn('Data/Unipartite-Graphs/%d.graph' % year))
+        bipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
+        unipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year, snap.TUNGraph)
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
-        print 'Finished loading input graphs/matrices for cycle. Time taken: %d' % (time.time() - start)
+        timing.markEvent('Loaded input graphs/matrices.')
 
         for weightF in ['jaccard', 'affinity', 'jaccard2']:
-            print '---------------------------------------'
-            print 'Starting %d: %s' % (year, weightF)
-
             adjMatrix = pickler.load('Data/Unipartite-Matrix/%d.%s' % (year, weightF))
             adjMatrix = adjMatrix.tocsc()
 
             features = generateFeatures(year, bipartiteGraph, unipartiteGraph, newToOldIDs, adjMatrix)
             pickler.save(features, 'Data/Features/%d%s.features' % (year, weightF))
 
-            print 'Finished %d: %s' % (year, weightF)
+            timing.markEvent('Processed %s weight function' % weightF)
 
-        print 'Total time taken for this cycle: %d' % (time.time() - start)
+        timing.finish()

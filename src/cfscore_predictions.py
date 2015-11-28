@@ -1,32 +1,30 @@
-import snap, time
+import snap
 import numpy as np
 from collections import defaultdict
 from sklearn.cross_validation import KFold
 from sklearn import linear_model
-from util import pickler
+from util import pickler, graph_funcs
+from util.Timer import Timer
 
 def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegression()):
-    print 'Running on year %d and weighting function %s' % (year, weighting)
-    start = time.time()
+    timing = Timer('year %d and weighting function %s' % (year, weighting))
 
     # Load the raph and donor features
-    print 'Loading old graphs and features'
-    bigraph = snap.TNEANet.Load(snap.TFIn('Data/Bipartite-Graphs/%d.graph' % year))
+    bigraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
     donorFeatures = pickler.load('Data/Features/%d%s.features' % (year, weighting))
-    print 'Time elapsed: %f' % (time.time() - start)
+    timing.markEvent('Loaded old graphs and features')
 
     # Calculate the recipient features
-    print 'Calculating recipient feaures'
     recipFeatures = getRecipFeatures(bigraph, donorFeatures)
-    print 'Time elapsed: %f' % (time.time() - start)
+    timing.markEvent('Calculated recipient features')
 
     # Convert the features and node cfscore attributes into X and Y matrices for
     # sklearn to use
-    print 'Running regression'
     print len(recipFeatures)
     X = np.asarray([features for rnodeid, features in recipFeatures.iteritems()])
     print X
     Y = np.absolute([bigraph.GetIntAttrDatN(rnodeid, 'cfs') for rnodeid in recipFeatures])
+    print Y
 
     rsquareds = []
 
@@ -37,7 +35,7 @@ def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegress
         Y_train, Y_test = Y[train], Y[test]
         clf.fit(X_train, Y_train)
         rsquareds.append(clf.score(X_test, Y_test))
-    print 'Time elapsed: %f' % (time.time() - start)
+    timing.markEvent('Ran regression')
 
     avgRSq = sum(rsquareds) / len(rsquareds)
     with open('Data/Results/%d%s.rsquareds' % (year, weighting), 'w') as f:
@@ -45,6 +43,7 @@ def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegress
         f.write('Average: %f\n\n' % avgRSq)
         for i, r in enumerate(rsquareds):
             f.write('%d: %f\n' % (i, r))
+    timing.finish()
 
 # Given a bipartite donor-recipient graph, creates two dictionaries from int to
 # dictionaries from ints to floats, and two dictionaries from ints to ints. The
@@ -113,10 +112,7 @@ def getRecipFeatures(graph, donorFeatures):
 
     good = 0
     bad = 0
-    for rnodeid in totalReceipts:
-        if graph.GetIntAttrDatN(rnodeid, 'IsRecip') != 1:
-            continue
-
+    for rnodeid in graph_funcs.getRecipients(graph):
         #for donor in receiptsFromDonor[rnodeid]:
         #    donorFeatures[donor].append(donationsToCand[rnodeid][donor])
 

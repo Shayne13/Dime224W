@@ -1,26 +1,26 @@
 #!/usr/bin/python
 
-import snap, time
+import snap
 from collections import defaultdict
-from util import pickler
+from util import pickler, graph_funcs
+from util.Timer import Timer
 import scipy.sparse as sp
 
 # Given an election cycle and a weighting function, creates a unipartite
 # donor-donor graph. The weighting function is described further down in this file.
 def createDonorDonorGraph(year, weightF):
-    print 'Creating donor-donor graph for %d' % year
-    start = time.time()
+    timing = Timer('creating donor-donor graph for %d' % year)
 
     # Load the old bipartite graph graph
-    bipartiteGraph = snap.TNEANet.Load(snap.TFIn('Data/Bipartite-Graphs/%d.graph' % year))
+    bipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
 
     # Load the info about each donor and their recipients
     numDonations, totalAmount, cands, transactions, amounts = getDonorInfos(bipartiteGraph)
-    reportTime('Got info about donor nodes', start)
+    timing.markEvent('Got info about donor nodes')
 
     # Create initial unipartite graph with just nodes and node attributes
     unipartiteGraph, oldToNew, newToOld = cloneBipartiteNodes(bipartiteGraph, cands)
-    reportTime('Finished cloning nodes', start)
+    timing.markEvent('Finished cloning nodes')
 
     jaccardData = []
     jaccard2Data = []
@@ -67,14 +67,15 @@ def createDonorDonorGraph(year, weightF):
 
         nodesDone += 1
         if nodesDone % 100 == 0:
-            reportTime('Finished %d outer loops out of %d' % (nodesDone, unipartiteGraph.GetNodes()), start)
+            timing.markEvent('Finished %d outer loops out of %d' % \
+                    (nodesDone, unipartiteGraph.GetNodes()))
 
     N = len(newToOld)
     jaccardAdjMat = sp.csr_matrix((jaccardData, (r, c)), shape = (N, N))
     jaccard2AdjMat = sp.csr_matrix((jaccard2Data, (r, c)), shape = (N, N))
     affinityAdjMat = sp.csr_matrix((affinityData, (r, c)), shape = (N, N))
 
-    reportTime('Unipartite Graph complete.', start)
+    timing.finish()
     return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat, newToOld, oldToNew
 
 # Takes in the bipartite graph and generates the initial unipartiteGraph with just nodes
@@ -86,10 +87,8 @@ def cloneBipartiteNodes(bipartiteGraph, cands, threshold = 2):
     newToOld = {}
 
     # Add each donor node from the old graph to the new one
-    for node in bipartiteGraph.Nodes():
+    for node in graph_funcs.getDonors(graph):
         oldID = node.GetId()
-        if bipartiteGraph.GetIntAttrDatN(oldID, 'IsRecip') == 1:
-            continue
         if len(cands[oldID]) <= threshold:
             continue
 
@@ -167,12 +166,6 @@ def cloneNode(graph1, graph2, nodeid):
     for i in range(strNames.Len()):
         graph2.AddStrAttrDatN(nodeid, strVals[i], strNames[i])
 
-# Helper function to report the time taken.
-def reportTime(event, start):
-    print event
-    print 'Time elapsed: %f' % (time.time() - start)
-
-
 # ----- WEIGHTING FUNCTIONS -----
 
 # The weighting function must take in the 2 cnodeids, their shared candidates
@@ -217,16 +210,15 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
 # ----- MAIN: -----
 
 if __name__ == '__main__':
-    start = time.time()
+    overallTiming = Timer('all unipartite graphs')
     for year in range(1980, 1982, 2):
+        timing = Timer('Creating unipartite graph for %d' % year)
 
         graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
 
         # Save the SNAP graph:
         outfile = 'Data/Unipartite-Graphs/%d.graph' % year
-        FOut = snap.TFOut(outfile)
-        graph.Save(FOut)
-        FOut.Flush()
+        graph_funcs.saveGraph(graph, outfile)
 
         # Save the weight matrices:
         matrixPrefix = 'Data/Unipartite-Matrix/%d' % year
@@ -239,7 +231,9 @@ if __name__ == '__main__':
         pickler.save(newToOld, mappingPrefix + '.newToOld')
         pickler.save(oldToNew, mappingPrefix + '.oldToNew')
 
-    print 'Created all unipartite graphs in %d' % (time.time() - start)
+        timing.finish()
+
+    overallTiming.finish()
 
 
 

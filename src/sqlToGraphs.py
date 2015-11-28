@@ -3,9 +3,10 @@
 # To call from the command line, run `python src/sqlToGraph <years>`, where
 # <years> contains each year whose graph you want to generate.
 
-import snap, time, sys
+import snap, sys
 import sqlite3 as lite
 from util import pickler, graph_funcs
+from util.Timer import Timer
 from collections import defaultdict
 
 ################################################################################
@@ -298,7 +299,6 @@ transactionIndices = {
 if __name__ == '__main__':
     for arg in sys.argv[1:]:
         year = int(arg)
-        print 'Creating graph for %d' % year
-        start = time.time()
+        timing = Timer('graph for %d' % year)
         createAndSaveGraph(year)
-        print 'Total time taken: %f' % (time.time() - start)
+        timing.finish()
