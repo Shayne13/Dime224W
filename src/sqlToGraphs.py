@@ -5,7 +5,7 @@
 
 import snap, time, sys
 import sqlite3 as lite
-from util import pickler
+from util import pickler, graph_funcs
 from collections import defaultdict
 
 ################################################################################
@@ -28,9 +28,7 @@ def createAndSaveGraph(year):
 
     # Save the graph to a file in Data/Bipartite-Graphs
     outfile = 'Data/Bipartite-Graphs/%d.graph' % year
-    FOut = snap.TFOut(outfile)
-    G.Save(FOut)
-    FOut.Flush()
+    graph_funcs.saveGraph(G, outfile)
 
     # Save the edge, contributor, and recipient mappings to files in Data/Mappings
     mapPrefix = 'Data/Mappings/%d' % year
@@ -48,7 +46,7 @@ def getRelevantDonors(graph, cur):
 
     # Query the DB for the cids for all donors with positive net donations
     # during this cycle and add their nodes to the network.
-    getCidsQuery = 'SELECT DISTINCT cid FROM Transactions GROUP BY cid HAVING SUM(amount) > 0'
+    getCidsQuery = 'SELECT DISTINCT cid FROM Transactions WHERE amount > 0'
     cur.execute(getCidsQuery)
     cidRows = cur.fetchall()
     for row in cidRows:
@@ -81,10 +79,10 @@ def getRelevantDonors(graph, cur):
 
     return contributorMapping
 
-# Gets the relevant recipients (i.e. all those who had net positive receipts
-# this cycle), adds them to the graph, and when possible, adds detailed
-# information about them from the Recipients table. Returns a mapping from years
-# to rids to seats to rnodeids.
+# Gets the relevant recipients (i.e. all those who had positive receipts this
+# cycle), adds them to the graph, and when possible, adds detailed information
+# about them from the Recipients table. Returns a mapping from years to rids to
+# seats to rnodeids.
 def getRelevantRecipients(graph, cur):
     # Initialize a map from years to rids to seats to rnodeids. The defaultdict
     # wrapping allows rnodeids to be inserted easily without having to check
@@ -92,9 +90,8 @@ def getRelevantRecipients(graph, cur):
     recipientMapping = defaultdict(defaultDictOfDicts)
 
     # Query the DB for the rids, years, and seats for all recipients with
-    # positive net receipts during this cycle and add their nodes to the
-    # network.
-    getRidsQuery = 'SELECT rid, year, seat FROM Transactions GROUP BY rid, year, seat HAVING SUM(amount) > 0'
+    # positive receipts during this cycle and add their nodes to the network.
+    getRidsQuery = 'SELECT rid, year, seat FROM Transactions GROUP BY rid, year, seat HAVING MAX(amount) > 0'
     cur.execute(getRidsQuery)
     ridRows = cur.fetchall()
     for row in ridRows:
@@ -151,6 +148,10 @@ def getRelevantTransactions(graph, cur, contribMapping, recipientMapping):
         cid = transaction[transactionIndices['cid']]
         rid = transaction[transactionIndices['rid']]
         seat = transaction[transactionIndices['seat']]
+        amount = transaction[transactionIndices['amount']]
+
+        # If the amount is negative or 0, we don't care; skip it.
+        if amount <= 0: continue
 
         # If the cid doesn't have a node, it's irrelevant; skip it.
         if cid not in contribMapping: continue
