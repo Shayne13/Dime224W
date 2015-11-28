@@ -88,7 +88,7 @@ def getAmountPercentages(graph):
     for recip in totalReceipts:
         if totalReceipts[recip] == 0:
             i += 1
-            print 'Failed on %d' % i
+            print 'Failed on %d, node %d' % (i, recip)
             continue
         for donor in receiptsFromDonor[recip]:
             #if totalDonations[donor] == 0:
