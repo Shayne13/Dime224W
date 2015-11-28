@@ -33,10 +33,22 @@ def testDonors(graph):
 
     return True
 
+# Function: testIsRecip
+# Tests that every node has IsRecip set to either 0 or 1.
+def testIsRecip(graph):
+    for node in graph.Nodes():
+        isRecip = graph.GetIntAttrDatN(node.GetId(), 'IsRecip')
+        if isRecip == 0 or isRecip == 1: continue
+        return False
+
+    return True
+
 # Function: testAmounts
 # Tests that every donor/recipient has net positive amounts donated/received
 def testAmounts(graph):
-    amounts = defaultdict(int)
+    amounts = {}
+    for node in graph.Nodes():
+        amounts[node.GetId()] = 0
     for edge in graph.Edges():
         amt = graph.GetIntAttrDatE(edge.GetId(), 'amount')
         amounts[edge.GetSrcNId()] += amt
@@ -56,6 +68,7 @@ def runTestsForYear(year):
     runTest('testRecipients', testRecipients, args)
     runTest('testDonors', testDonors, args)
     runTest('testAmounts', testAmounts, args)
+    runTest('testIsRecip', testIsRecip, args)
 
 # Called by the runTests script. Takes in a list of all the years whose graphs
 # are to be tested and tests each of them.
