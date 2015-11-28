@@ -6,7 +6,7 @@
 
 import snap, sys
 from ..util import graph_funcs
-from ..tests.testUtil import runTest
+from ..tests.testUtil import runTest, runMultipleTests
 from collections import defaultdict
 
 ################################################################################
@@ -65,10 +65,8 @@ def runTestsForYear(year):
     print 'Testing year %d' % year
     graph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
     args = (graph,)
-    runTest('testRecipients', testRecipients, args)
-    runTest('testDonors', testDonors, args)
-    runTest('testAmounts', testAmounts, args)
-    runTest('testIsRecip', testIsRecip, args)
+    tests = [testRecipients, testDonors, testAmounts, testIsRecip]
+    runMultipleTests(tests, args)
 
 # Called by the runTests script. Takes in a list of all the years whose graphs
 # are to be tested and tests each of them.
