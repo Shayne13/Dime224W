@@ -18,10 +18,16 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     unipartiteFeatures = convertNewToOldIDs(extractUnipartiteFeatures(unipartiteGraph, adjMatrix), newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
-    # append unipartite features to bipartite features for each node, returning combined feature dictionary:
+    # append unipartite features to bipartite features for each node, returning combined feature dictionary.
+    # If the donor is not in the unipartite feature graph then we just take the default values (since the 
+    # node falls below the unipartite threshold from sqlToGraphs):
     features = {}
-    for oldNID in unipartiteFeatures:
-        features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
+    for donorNode in graph_funcs.getDonors(bipartite):
+        oldNID = donorNode.GetId()
+        if oldNID in unipartiteFeatures:
+            features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
+        else:
+            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures()
     timing.finish()
 
     return features
@@ -32,10 +38,8 @@ def extractBipartiteFeatures(bipartiteGraph):
     features = defaultdict(list)
     numDonations, totalAmount, cands, transactions, amounts = getDonorInfos(bipartiteGraph)
 
-    for i, node in enumerate(bipartiteGraph.Nodes()):
+    for node in graph_funcs.getDonors(bipartiteGraph):
         nid = node.GetId()
-        if nid not in totalAmount:
-            continue
 
         # Total amount donated:
         features[nid].append(totalAmount[nid])
@@ -81,7 +85,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing.markEvent('4. Computed clustering coefficients.')
 
     # Eigenvectors:
-    eigenVal, eigenVecs = sp.linalg.eigs(adjMat, k=1)
+    # eigenVal, eigenVec = sp.linalg.eigs(adjMat, k=1)
     timing.markEvent('5. Computed eigenvectors.')
 
     # Pagerank:
@@ -94,10 +98,16 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
         # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
         # features[nid].append(NIdCCfH[nid])
-        features[nid].append(float(eigenVecs[nid][0]))
+        # features[nid].append(float(eigenVec[nid][0]))
         features[nid].append(pageRanks[nid])
 
     timing.finish()
+
+    # print 'Eigenvector check:'
+    # print 'min: ' + str(np.min(eigenVec)) + ' goes to ' + str(float(np.min(eigenVec)))
+    # print 'max: ' + str(np.max(eigenVec)) + ' goes to ' + str(float(np.max(eigenVec)))
+    # print 'eigenval: ' + str(eigenVal)
+
 
     return features
 
@@ -105,7 +115,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
 # features map for the unipartite graph.
 def getUnipartiteSurfaceFeatures(graph, adjMat, features):
 
-    for i, node in enumerate(graph.Nodes()):
+    for node in graph.Nodes():
         nid = node.GetId()
 
         # Node degree:
@@ -184,17 +194,31 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
 
     return oldIDFeatureMapping
 
+# The default unipartite features for a node not in the unipartite graph:
+def defaultUnipartiteFeatures():
+    defaultFeatures = []
+    defaultFeatures.append(0.0) # degree
+    # defaultFeatures.append() # nodes at hop 2
+    # defaultFeatures.append(0) # avg. weight of edges
+    defaultFeatures.append(1.0) # size of connected component
+    # defaultFeatures.append(0.0) # clustering coefficient
+    # defaultFeatures.append(0.0) # eigenvector value
+    defaultFeatures.append(0.0) # pagerank score
+    return defaultFeatures
+
 
 if __name__ == '__main__':
     for year in range(1980, 1982, 2):
+        print 
         timing = Timer('creating unipartite graph for %d' % year)
 
         bipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
-        unipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year, snap.TUNGraph)
+        unipartiteGraph = graph_funcs.loadGraph('Data/Unipartite-Graphs/%d.graph' % year, snap.TUNGraph)
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 
         for weightF in ['jaccard', 'affinity', 'jaccard2']:
+            print '******* %s *******' % weightF
             adjMatrix = pickler.load('Data/Unipartite-Matrix/%d.%s' % (year, weightF))
             adjMatrix = adjMatrix.tocsc()
 

@@ -76,3 +76,7 @@
 * FOREIGN KEY(cid) REFERENCES Contributors(cid),
 * FOREIGN KEY(rid) REFERENCES Recipients(rid),
 * FOREIGN KEY(seat) REFERENCES Recipients(seat)
+
+## Attributes on Bipartite Graph Nodes:
+
+* IsRecip is 0: contributor, 1: recipient with CFScore, or 2: recipipent without CFScore

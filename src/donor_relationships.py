@@ -87,7 +87,7 @@ def cloneBipartiteNodes(bipartiteGraph, cands, threshold = 2):
     newToOld = {}
 
     # Add each donor node from the old graph to the new one
-    for node in graph_funcs.getDonors(graph):
+    for node in graph_funcs.getDonors(bipartiteGraph):
         oldID = node.GetId()
         if len(cands[oldID]) <= threshold:
             continue
@@ -198,8 +198,8 @@ def jaccardSimilarity(id1, id2, sharedCands, numDonations, totalAmount, cands, t
 def jaccardSimilarity2(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
     donationIntersectionAmount = sum([min(amounts[id1][cand], amounts[id2][cand]) for cand in sharedCands])
     denom = (totalAmount[id1] + totalAmount[id2])
-    if (denom == 0):
-        return 'jaccard2', 0.0
+    # if (denom == 0):
+    #     return 'jaccard2', 0.0
     return 'jaccard2', float(donationIntersectionAmount) / denom
 
 # See: https://stats.stackexchange.com/questions/142132/is-this-a-valid-method-for-unipartite-projection-of-a-bipartite-graph
@@ -211,7 +211,7 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
 
 if __name__ == '__main__':
     overallTiming = Timer('all unipartite graphs')
-    for year in range(1980, 1982, 2):
+    for year in range(1980, 1986, 2):
         timing = Timer('Creating unipartite graph for %d' % year)
 
         graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)

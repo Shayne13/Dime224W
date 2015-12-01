@@ -6,8 +6,8 @@ import sqlite3 as sql
 from itertools import chain
 from util.Timer import Timer
 
-csv_dir = '../Data/CSVs/'
-db_dir = '../Data/DBs/'
+csv_dir = 'Data/CSVs/'
+db_dir = 'Data/DBs/'
 csv_1982 = csv_dir + 'contribDB_1982.csv'
 recipient_path = csv_dir + 'candidate_cfscores_st_fed_1979_2012.csv'
 contributors_path = csv_dir + 'contributor_cfscores_st_fed_1979_2012.csv'
@@ -82,8 +82,8 @@ def filterRecipients(block, observedKeys):
 def filterTransactions(block):
     newBlock = []
     for l in block:
-        # If amount is 0, or (amount is negative, but type is not 22Y):
-        if (l[3] == 0 or (l[3] < 0 and l[2] != '22Y')):
+        # If amount is <= 0:
+        if (l[3] <= 0.0):
             continue
         newBlock.append(l)
 

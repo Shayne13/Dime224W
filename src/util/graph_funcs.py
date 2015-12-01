@@ -16,9 +16,14 @@ def saveGraph(graph, filename):
     FOut.Flush()
 
 # Generator over all the recipient nodes in the graph
-def getRecipients(graph):
+# If cfs is true we only return IsRecip == 1 (has cfscore)
+# If cfs is false we also return IsRecip == 2 (cfscore is null)
+def getRecipients(graph, cfs=False):
     for node in graph.Nodes():
-        if graph.GetIntAttrDatN(node.GetId(), 'IsRecip') == 1:
+        val = graph.GetIntAttrDatN(node.GetId(), 'IsRecip')
+        if val == 1:
+            yield node
+        elif cfs == False and val == 2:
             yield node
 
 # Generator over all the donor nodes in the graph

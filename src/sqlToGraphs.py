@@ -92,14 +92,17 @@ def getRelevantRecipients(graph, cur):
 
     # Query the DB for the rids, years, and seats for all recipients with
     # positive receipts during this cycle and add their nodes to the network.
-    getRidsQuery = 'SELECT rid, year, seat FROM Transactions GROUP BY rid, year, seat HAVING MAX(amount) > 0'
+    getRidsQuery = 'SELECT rid, year, seat, cfs FROM Transactions GROUP BY rid, year, seat HAVING MAX(amount) > 0'
     cur.execute(getRidsQuery)
     ridRows = cur.fetchall()
     for row in ridRows:
-        rid, year, seat = row[0], row[1], row[2]
+        rid, year, seat, cfs = row[0], row[1], row[2], row[3]
         rnodeid = graph.AddNode()
         recipientMapping[year][rid][seat] = rnodeid
-        graph.AddIntAttrDatN(rnodeid, 1, 'IsRecip')
+        if (cfs == None):
+            graph.AddIntAttrDatN(rnodeid, 2, 'IsRecip')
+        else:
+            graph.AddIntAttrDatN(rnodeid, 1, 'IsRecip')
         graph.AddIntAttrDatN(rnodeid, 0, 'IsFullNode')
 
     # Get detailed info about each recipient in the Recipients table and update

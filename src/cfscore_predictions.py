@@ -9,7 +9,7 @@ from util.Timer import Timer
 def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegression()):
     timing = Timer('year %d and weighting function %s' % (year, weighting))
 
-    # Load the raph and donor features
+    # Load the graph and donor features
     bigraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
     donorFeatures = pickler.load('Data/Features/%d%s.features' % (year, weighting))
     timing.markEvent('Loaded old graphs and features')
@@ -22,8 +22,10 @@ def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegress
     # sklearn to use
     print len(recipFeatures)
     X = np.asarray([features for rnodeid, features in recipFeatures.iteritems()])
+    print len(X)
     print X
-    Y = np.absolute([bigraph.GetIntAttrDatN(rnodeid, 'cfs') for rnodeid in recipFeatures])
+    Y = np.absolute([bigraph.GetFltAttrDatN(rnodeid, 'cfs') for rnodeid in recipFeatures])
+    print len(Y)
     print Y
 
     rsquareds = []
@@ -78,23 +80,21 @@ def getAmountPercentages(graph):
         totalReceipts[recip] += amount
         #donationsToCand[donor][recip] += amount
         #totalDonations[donor] += amount
-    print 'Created unnormalized donation dicts'
+    print 'Created unnormalized donation dicts of size: %d' % len(totalReceipts)
 
     # Normalize the receiptsFromDonor and donationsToCand dictionaries to be
     # percentages of the relevant total rather than raw dollar amounts
     i = 0
-    print len(totalReceipts)
     for recip in totalReceipts:
         if totalReceipts[recip] == 0:
             i += 1
             print 'Failed on %d, node %d' % (i, recip)
             continue
         for donor in receiptsFromDonor[recip]:
-            #if totalDonations[donor] == 0:
-            #    print 'Zero on donor %d' % donor
+            # if totalDonations[donor] == 0: print 'Zero on donor %d' % donor
             receiptsFromDonor[recip][donor] /= float(totalReceipts[recip])
             #donationsToCand[donor][recip] /= float(totalDonations[donor])
-    print 'Created normalized donation dicts'
+    print 'Created normalized donation dicts.'
 
     return receiptsFromDonor, totalReceipts
     #return receiptsFromDonor, donationsToCand, totalReceipts, totalDonations
@@ -112,7 +112,8 @@ def getRecipFeatures(graph, donorFeatures):
 
     good = 0
     bad = 0
-    for rnodeid in graph_funcs.getRecipients(graph):
+    for recipNode in graph_funcs.getRecipients(graph, True):
+        rnodeid = recipNode.GetId()
         #for donor in receiptsFromDonor[rnodeid]:
         #    donorFeatures[donor].append(donationsToCand[rnodeid][donor])
 
@@ -148,8 +149,7 @@ def validWeights(donorFeatures, weightsForDonors):
 def processDonorFeaturesForRecip(donorFeatures, weightsForDonors):
     eligibleDonors = set(weightsForDonors.keys()) & set(donorFeatures.keys())
     weights = [weightsForDonors[donor] for donor in eligibleDonors]
-    unnormalizedFeatureVecs = \
-        np.asarray([donorFeatures[donor] for donor in eligibleDonors])
+    unnormalizedFeatureVecs = np.asarray([donorFeatures[donor] for donor in eligibleDonors])
     #print np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
     return np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
 
