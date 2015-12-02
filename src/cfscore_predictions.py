@@ -7,7 +7,7 @@ from util import pickler, graph_funcs
 from util.Timer import Timer
 
 def trainAndTestModels(year, weighting, k = 10, clf = linear_model.LinearRegression()):
-    timing = Timer('year %d and weighting function %s' % (year, weighting))
+    timing = Timer('year *** %d *** and weighting function *** %s ***' % (year, weighting))
 
     # Load the graph and donor features
     bigraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)

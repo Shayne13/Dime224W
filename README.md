@@ -77,6 +77,22 @@
 * FOREIGN KEY(rid) REFERENCES Recipients(rid),
 * FOREIGN KEY(seat) REFERENCES Recipients(seat)
 
+## Files (in pipeline run order):
+
+* 1. csv_parser.py
+* 2. sqlToGraphs.py
+* 3. donor_relationships.py
+* 4. feature_extractor.py
+* 5. feature_compiler.py
+* 6. cfscore_predictions.py
+
+# Helper Files:
+
+* graph_funcs.py
+* pickler.py
+* Timer.py
+
 ## Attributes on Bipartite Graph Nodes:
 
-* IsRecip is 0: contributor, 1: recipient with CFScore, or 2: recipipent without CFScore
+* 'IsRecip' is 0: contributor, 1: recipient with CFScore, or 2: recipipent without CFScore
+* 'WccId' is the id of the weakly connected component that the node is in
