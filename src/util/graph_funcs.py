@@ -16,19 +16,26 @@ def saveGraph(graph, filename):
     FOut.Flush()
 
 # Generator over all the recipient nodes in the graph
-# If cfs is true we only return IsRecip == 1 (has cfscore)
-# If cfs is false we also return IsRecip == 2 (cfscore is null)
-def getRecipients(graph, cfs=False):
+# If cfs is True we only return nodes with valid cfs scores (i.e. IsRecip == 1)
+# If cfs is False we also return nodes without valid cfs scores (i.e. IsRecip ==
+# 2).
+# If full is True we only return full nodes with all their node attributes.
+# If full is False we return all recipients, even stripped down ones.
+def getRecipients(graph, cfs=False, full=False):
     for node in graph.Nodes():
         val = graph.GetIntAttrDatN(node.GetId(), 'IsRecip')
+        if full and graph.GetIntAttrDatN(node.GetId(), 'IsFullNode') == 0: continue
         if val == 1:
             yield node
         elif cfs == False and val == 2:
             yield node
 
 # Generator over all the donor nodes in the graph
-def getDonors(graph):
+# If full is True we only return full nodes with all their node attributes.
+# If full is False we return all donor, even stripped down ones.
+def getDonors(graph, full=False):
     for node in graph.Nodes():
+        if full and graph.GetIntAttrDatN(node.GetId(), 'IsFullNode') == 0: continue
         if graph.GetIntAttrDatN(node.GetId(), 'IsRecip') == 0:
             yield node
 
@@ -45,4 +52,3 @@ def getEdgesWithNodeset(graph, nodeids):
     for edge in graph.Edges():
         if edge.GetSrcNId() in idSet or edge.GetDstNId() in idSet:
             yield edge
-
