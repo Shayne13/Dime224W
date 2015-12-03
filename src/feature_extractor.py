@@ -71,8 +71,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     #     avgWeightDenoms[r] += 1.0
     # avgWeights = weightSums / avgWeightDenoms
     # zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
-    # print zeros
-    # avgWeights[zeros] = 1 / len(avgWeights)
+    # avgWeights[zeros] = 1.0 / len(avgWeights)
     timing.markEvent('2. Computed average weights.')
 
     # Size of connected component:
