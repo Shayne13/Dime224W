@@ -30,7 +30,7 @@ def getCategoricalFeatureVec(graph, featureFunc, isRecip=True, full=False):
 
     return getFeatures
 
-# Function: getFeatureVecForIntAttr
+# Function: getIntAttrFeatureVec
 # Params: graph as snap.TNEANet graph
 #         attr as as string indicating int node attribute name
 #         isRecip: optional bool indicating whether to iterate over recipients
@@ -38,14 +38,14 @@ def getCategoricalFeatureVec(graph, featureFunc, isRecip=True, full=False):
 #         full: optional bool indicating whether to iterate over all donor/
 #               recipient nodes (default) or only full nodes.
 # Returns: function from TNEANet node to a numpy vector
-# ---------------------------------
+# ------------------------------
 # Convenience wrapper around getCategoricalFeatureVec for the common case of
 # a categorical int node attribute in the bipartite graph.
-def getFeatureVecForIntAttr(graph, attr, isRecip=True, full=False):
+def getIntAttrFeatureVec(graph, attr, isRecip=True, full=False):
     featureFunc = lambda nodeid: graph.GetIntAttrDatN(nodeid, attr)
     return getCategoricalFeatureVec(graph, featureFunc, isRecip, full)
 
-# Function: getFeatureVecForStrAttr
+# Function: getStrAttrFeatureVec
 # Params: graph as snap.TNEANet graph
 #         attr as as string indicating string node attribute name
 #         isRecip: optional bool indicating whether to iterate over recipients
@@ -53,9 +53,9 @@ def getFeatureVecForIntAttr(graph, attr, isRecip=True, full=False):
 #         full: optional bool indicating whether to iterate over all donor/
 #               recipient nodes (default) or only full nodes.
 # Returns: function from TNEANet node to a numpy vector
-# ---------------------------------
+# ------------------------------
 # Convenience wrapper around getCategoricalFeatureVec for the common case of
 # a categorical string node attribute in the bipartite graph.
-def getFeatureVecForStrAttr(graph, attr, isRecip=True, full=False):
+def getStrAttrFeatureVec(graph, attr, isRecip=True, full=False):
     featureFunc = lambda nodeid: graph.GetStrAttrDatN(nodeid, attr)
     return getCategoricalFeatureVec(graph, featureFunc, isRecip, full)
