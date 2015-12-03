@@ -1,9 +1,20 @@
+#!/usr/bin/python
+# Module: cfscore_predictions
+# Runs the regression for a particular saved X matrix and Y vector
+#
+# To call from the command line, run `python src/cfscore_predictions <years>
+# where years contains each year whose regression you want run.
+
 import sys
 import numpy as np
 from sklearn.cross_validation import KFold
 from sklearn import linear_model
 from util import pickler
 from util.Timer import Timer
+
+################################################################################
+# Module functions #
+################################################################################
 
 def trainAndTestModels(year, extension, k = 10, clf = linear_model.LinearRegression()):
     timing = Timer('Running regression for %d.%s' % (year, extension))
@@ -27,6 +38,10 @@ def trainAndTestModels(year, extension, k = 10, clf = linear_model.LinearRegress
         for i, r in enumerate(rsquareds):
             f.write('%d: %f\n' % (i, r))
     timing.finish()
+
+################################################################################
+# Module command-line behavior #
+################################################################################
 
 if __name__ == '__main__':
     extensions = ['jaccard', 'jaccard2', 'affinity', 'baseline']
