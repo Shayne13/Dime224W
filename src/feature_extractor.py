@@ -227,3 +227,11 @@ if __name__ == '__main__':
             timing.markEvent('Processed %s weight function' % weightF)
 
         timing.finish()
+
+
+# Features:
+
+# 1. degree 
+# 2. nodes at hop 2
+# 3. avg. weight of edges
+# 4.
