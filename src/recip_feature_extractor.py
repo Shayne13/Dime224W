@@ -69,7 +69,7 @@ def getBaselineFeatures(graph):
 # functions).
 def featureDictToVecs(graph, featureDict, y_fun=None, x_funs=None):
     X = np.asarray([features for rnodeid, features in featureDict.iteritems()])
-    Y = np.absolute([graph.GetFltAttrDatN(rnodeid, 'cfs') for rnodeid in featureDict])
+    Y = np.asarray([graph.GetFltAttrDatN(rnodeid, 'cfs') for rnodeid in featureDict])
     if y_fun:
         Y = y_fun(Y)
     if x_funs:
@@ -173,4 +173,3 @@ if __name__ == '__main__':
                     % weighting)
 
         timing.finish()
-

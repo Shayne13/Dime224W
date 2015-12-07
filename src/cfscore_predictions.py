@@ -16,9 +16,12 @@ from util.Timer import Timer
 # Module functions #
 ################################################################################
 
-def trainAndTestModels(year, extension, k = 10, clf = linear_model.LinearRegression()):
+def trainAndTestModels(year, extension, k = 10,
+        clf = linear_model.LinearRegression(),
+        transF = None):
     timing = Timer('Running regression for %d.%s' % (year, extension))
     X, Y = pickler.load('Data/Recip-Features/%d.%s' % (year, extension))
+    if transF: Y = transF(Y)
     timing.markEvent('Loaded X and Y')
     rsquareds = []
 
