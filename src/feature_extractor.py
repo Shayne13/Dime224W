@@ -234,4 +234,8 @@ if __name__ == '__main__':
 # 1. degree 
 # 2. nodes at hop 2
 # 3. avg. weight of edges
-# 4.
+# 4. size of connected component
+# 5. categorical label of connected component
+# 6. clustering coefficient
+# 7. eigenvector value
+# 8. pagerank score

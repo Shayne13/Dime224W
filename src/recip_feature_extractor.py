@@ -35,8 +35,7 @@ def getRecipFeatures(graph, donorFeatures):
             pct = receiptsFromDonor[rnodeid][donor] / float(totalDonations[donor])
             donorFeatures[donor].append(pct)
 
-        recipFeatures[rnodeid] = \
-            processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
+        recipFeatures[rnodeid] = processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
         #recipFeatures[rnodeid] = np.append(
         #    getPartialNodeRecipSpecificFeatures(graph, rnodeid),
         #    processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
@@ -122,14 +121,66 @@ def getDonationAmounts(graph):
 # computes the portion of the recipient's feature vector dependent on the donor
 # features.
 #
-# Currently only uses a weighted average. Will incorporate more summary stats
-# later.
-# TODO: Expand beyond just weighted average of network features (e.g. max, min,
-# median, 25-75 percentiles, variance)
+# Currently calculates min, max, mean, median, 25-quantile, 75-quantile and variance.
 def processDonorFeaturesForRecip(donorFeatures, weightsForDonors):
+    # NB: Everything added to features (not 'squares') is weighted
+    features = []
+    
     weights = [weightsForDonors[donor] for donor in weightsForDonors]
-    unnormalizedFeatureVecs = [donorFeatures[donor] for donor in weightsForDonors]
-    return np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
+    unnormalizedFeatureVecs = np.array([donorFeatures[donor] for donor in weightsForDonors])
+    squares = []
+    
+    # Iterate over the columns (distribution for a feature) calculating quantiles and squares.
+    for col in range(len(unnormalizedFeatureVecs[0])):
+        quantiles = weighted_quantile(unnormalizedFeatureVecs[:,col], [0.0, 0.25, 0.5, 0.75, 1.0], sample_weight=weights)
+        squares.append(np.square(unnormalizedFeatureVecs[:,col]))
+        print quantiles.tolist()
+        features += quantiles.tolist()
+    
+    averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0).tolist()
+    variances = (np.average(squares, weights=weights, axis=1) - np.square(averages)).tolist()
+
+    features = features + averages + variances
+    return features
+
+
+# This calculates weighted quantiles.
+# Modified from https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy.
+def weighted_quantile(values, quantiles, sample_weight=None, values_sorted=False, old_style=False):
+    """ Very close to numpy.percentile, but supports weights.
+    NOTE: quantiles should be in [0, 1]!
+    :param values: numpy.array with data
+    :param quantiles: array-like with many quantiles needed
+    :param sample_weight: array-like of the same length as `array`
+    :param values_sorted: bool, if True, then will avoid sorting of initial array
+    :param old_style: if True, will correct output to be consistent with numpy.percentile.
+    :return: numpy.array with computed quantiles.
+    """
+    values = np.array(values)
+    quantiles = np.array(quantiles)
+    if sample_weight is None:
+        sample_weight = np.ones(len(values))
+    sample_weight = np.array(sample_weight)
+
+    assert np.all(quantiles >= 0) and np.all(quantiles <= 1), 'quantiles should be in [0, 1]'
+
+    if not values_sorted:
+        sorter = np.argsort(values)
+        values = values[sorter]
+        sample_weight = sample_weight[sorter]
+
+    weighted_quantiles = np.cumsum(sample_weight) - 0.5 * sample_weight
+
+    if old_style:
+        # To be convenient with numpy.percentile
+        weighted_quantiles -= weighted_quantiles[0]
+        weighted_quantiles /= weighted_quantiles[-1]
+    else:
+        weighted_quantiles /= np.sum(sample_weight)
+
+    return np.interp(quantiles, weighted_quantiles, values)
+
+
 
 # Creates a feature vector of the node features available only to full recipient
 # nodes.
@@ -148,7 +199,7 @@ def getAllRecipSpecificFeatures(graph, rnodeid):
         getPartialNodeRecipFeatures(graph, rnodeid),
     )
 
-################################################################################
+#####################################################################r###########
 # Module command-line behavior #
 ################################################################################
 
