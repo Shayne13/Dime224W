@@ -207,11 +207,26 @@ def defaultUnipartiteFeatures():
 
 # Adds the size of the connected component as an attribute for each node in the unipartiteGraph
 def addConnectedComponentSizeAtrributes(unipartiteGraph):
-    unipartiteGraph.AddIntAttrN('ConnectedComponentSize')
-    cnctComponents = calcCnctComponents(unipartiteGraph)
+    unipartiteGraph.AddIntAttrN('ConnectedComponent')
+    
+    components = {}
+    
+    CnCom = snap.TIntV()
+    component = 0
+    for node in graph.Nodes():
+        nodeid = node.GetId()
+        if nodeid in components:
+            continue
+        snap.GetNodeWcc(graph, nodeid, CnCom)
+        for connectedNode in CnCom:
+            components[connectedNode.GetId()] = component
+        component += 1
+            
     for node in unipartiteGraph.Nodes():
         nid = node.GetId()
-        unipartiteGraph.AddIntAttrDatN(nid, cnctComponents[nid], 'ConnectedComponentSize')         
+        unipartiteGraph.AddIntAttrDatN(nid, components[nid], 'ConnectedComponent')         
+
+
 
 if __name__ == '__main__':
     for year in range(1980, 1982, 2):
