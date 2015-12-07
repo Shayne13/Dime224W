@@ -121,28 +121,32 @@ def getDonationAmounts(graph):
 # computes the portion of the recipient's feature vector dependent on the donor
 # features.
 #
-# Currently calculates min, max, mean, median, 25-quantile, 75-quantile and variance.
+# Currently calculates min, max, mean, median, 25-quantile, 75-quantile and standard deviation.
 def processDonorFeaturesForRecip(donorFeatures, weightsForDonors):
-    # NB: Everything added to features (not 'squares') is weighted
-    features = []
+    # NB: Everything added to features is weighted
+
+    # Should be 7N X 1 vector where N is number of (donor) features
+    features = np.zeros(0)
     
+    # M x 1 vector, where M is number of donors in weightsForDonors
     weights = [weightsForDonors[donor] for donor in weightsForDonors]
+
+    # M X N matrix, where M is number of donors in weightsForDonors and N is number of features
     unnormalizedFeatureVecs = np.array([donorFeatures[donor] for donor in weightsForDonors])
     squares = []
     
     # Iterate over the columns (distribution for a feature) calculating quantiles and squares.
+    # Runs N times
     for col in range(len(unnormalizedFeatureVecs[0])):
+        # 5 X 1 vector
         quantiles = weighted_quantile(unnormalizedFeatureVecs[:,col], [0.0, 0.25, 0.5, 0.75, 1.0], sample_weight=weights)
-        squares.append(np.square(unnormalizedFeatureVecs[:,col]))
-        print quantiles.tolist()
-        features += quantiles.tolist()
+        features = np.append(features, quantiles)
     
-    averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0).tolist()
-    variances = (np.average(squares, weights=weights, axis=1) - np.square(averages)).tolist()
+    averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
+    averageOfSquares = np.average(np.square(unnormalizedFeatureVecs), weights=weights, axis=0)
+    stdevs = np.sqrt(averageOfSquares - np.square(averages))
 
-    features = features + averages + variances
-    return features
-
+    return np.append(features, [averages, stdevs])
 
 # This calculates weighted quantiles.
 # Modified from https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy.
@@ -156,6 +160,8 @@ def weighted_quantile(values, quantiles, sample_weight=None, values_sorted=False
     :param old_style: if True, will correct output to be consistent with numpy.percentile.
     :return: numpy.array with computed quantiles.
     """
+
+    # Let N be the length of values, Q be the length of quantiles
     values = np.array(values)
     quantiles = np.array(quantiles)
     if sample_weight is None:
@@ -199,7 +205,7 @@ def getAllRecipSpecificFeatures(graph, rnodeid):
         getPartialNodeRecipFeatures(graph, rnodeid),
     )
 
-#####################################################################r###########
+################################################################################
 # Module command-line behavior #
 ################################################################################
 

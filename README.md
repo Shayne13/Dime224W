@@ -83,7 +83,7 @@
 * 2. sqlToGraphs.py
 * 3. donor_relationships.py
 * 4. feature_extractor.py
-* 5. feature_compiler.py
+* 5. recip_feature_extractor.py
 * 6. cfscore_predictions.py
 
 # Helper Files:

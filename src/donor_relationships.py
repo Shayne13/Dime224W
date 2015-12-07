@@ -1,4 +1,7 @@
 #!/usr/bin/python
+# Module: donor_relationships
+# To call from the command line, run `python src/donor_relationships <years>`, where
+# <years> contains each year whose graph you want to generate.
 
 import snap
 from collections import defaultdict
@@ -166,6 +169,7 @@ def cloneNode(graph1, graph2, nodeid):
     for i in range(strNames.Len()):
         graph2.AddStrAttrDatN(nodeid, strVals[i], strNames[i])
 
+
 # ----- WEIGHTING FUNCTIONS -----
 
 # The weighting function must take in the 2 cnodeids, their shared candidates
@@ -207,11 +211,14 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
     score = ((len(sharedCands) * len(cands)) / (len(cands[id1]) + len(cands[id2]))) / 1.0
     return 'affinity', score
 
-# ----- MAIN: -----
+################################################################################
+# Module command-line behavior #
+################################################################################
 
 if __name__ == '__main__':
     overallTiming = Timer('all unipartite graphs')
-    for year in range(1980, 1986, 2):
+    for arg in sys.argv[1:]:
+        year = int(arg)
         timing = Timer('Creating unipartite graph for %d' % year)
 
         graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
@@ -234,7 +241,6 @@ if __name__ == '__main__':
         timing.finish()
 
     overallTiming.finish()
-
 
 
 # ------ OLD CODE: ------

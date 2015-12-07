@@ -1,9 +1,12 @@
 #!/usr/bin/python
+# Module: feature_extractor
+# To call from the command line, run `python src/feature_extractor <years>`, where
+# <years> contains each year whose graph you want to generate.
 
 import sys, snap
 import scipy.sparse as sp
 import scipy.sparse.linalg as linalg
-from util import pickler, graph_funcs
+from util import pickler, graph_funcs, categorical
 from util.Timer import Timer
 from collections import defaultdict
 import numpy as np
@@ -15,7 +18,8 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
     timing.markEvent('Extracted bipartite features.')
 
-    unipartiteFeatures = convertNewToOldIDs(extractUnipartiteFeatures(unipartiteGraph, adjMatrix), newToOldIDs)
+    rawUnifeatures, componentFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    unipartiteFeatures = convertNewToOldIDs(rawUnifeatures, newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
     # append unipartite features to bipartite features for each node, returning combined feature dictionary.
@@ -27,7 +31,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
         if oldNID in unipartiteFeatures:
             features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
         else:
-            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures()
+            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc)
     timing.finish()
 
     return features
@@ -54,12 +58,14 @@ def extractBipartiteFeatures(bipartiteGraph):
 
     return features
 
-
+# Returns both the dictionary from unipartite node id to feature vector AND the categorical 
+# feature func for connected component ID.
+# TODO: Fix this decomp.
 def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing = Timer('extracting unipartite features')
 
     features = defaultdict(list)
-    getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
+    componentFeatureFunc = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
 
     timing.markEvent('1. Extracted surface features')
 
@@ -108,11 +114,18 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # print 'eigenval: ' + str(eigenVal)
 
 
-    return features
+    return features, componentFeatureFunc
 
 # Takes the graph and adjacency matrix, and uses these to update the
 # features map for the unipartite graph.
+# Returns the categorical feature function (from connected component ID to dummy feature vec).
+# TODO: Improve this style.
 def getUnipartiteSurfaceFeatures(graph, adjMat, features):
+
+    # Cateogrical connected component labels:
+    idToCC = labelConnectedComponents(graph)
+    featureFunc = lambda x: 0.0 if x not in idToCC else idToCC[x]
+    componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
 
     for node in graph.Nodes():
         nid = node.GetId()
@@ -124,6 +137,10 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
         # nodesAtHop = snap.TIntV()
         # features[nid].append(snap.GetNodesAtHop(graph, nid, 2, nodesAtHop, False))
 
+        # Connecetd component category features:
+        features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
+
+    return componentFeatureFunc
 
 # Efficiently computes the connected components of the graph returning
 # a dictionary: { nid -> lenComp }
@@ -194,51 +211,52 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
     return oldIDFeatureMapping
 
 # The default unipartite features for a node not in the unipartite graph:
-def defaultUnipartiteFeatures():
+def defaultUnipartiteFeatures(componentFeatureFunc):
     defaultFeatures = []
     defaultFeatures.append(0.0) # degree
+    defaultFeatures += componentFeatureFunc(0).tolist()
     # defaultFeatures.append() # nodes at hop 2
     # defaultFeatures.append(0) # avg. weight of edges
     defaultFeatures.append(1.0) # size of connected component
     # defaultFeatures.append(0.0) # clustering coefficient
     # defaultFeatures.append(0.0) # eigenvector value
     defaultFeatures.append(0.0) # pagerank score
-    return defaultFeatures
+    return defaultFeatures     
 
-# Adds the index of the connected component as an attribute for each node in the unipartiteGraph
-def addConnectedComponentAtrributes(unipartiteGraph):
-    unipartiteGraph.AddIntAttrN('ConnectedComponent')
-    
+# Creates a dictionary from node id to connected component index for a given graph.
+def labelConnectedComponents(graph):
+
     components = {}
-    
     CnCom = snap.TIntV()
-    component = 0
+    component = 1
+
     for node in graph.Nodes():
         nodeid = node.GetId()
+
         if nodeid in components:
             continue
+
         snap.GetNodeWcc(graph, nodeid, CnCom)
-        for connectedNode in CnCom:
-            components[connectedNode.GetId()] = component
+        if len(CnCom) == 1:
+            components[nodeid] = 0.0
+        else:
+            for cnid in CnCom:
+                components[cnid] = component
         component += 1
-            
-    for node in unipartiteGraph.Nodes():
-        nid = node.GetId()
-        unipartiteGraph.AddIntAttrDatN(nid, components[nid], 'ConnectedComponent')         
 
+    return components
 
+################################################################################
+# Module command-line behavior #
+################################################################################
 
 if __name__ == '__main__':
-    for year in range(1980, 1982, 2):
-        print 
+    for arg in sys.argv[1:]:
+        year = int(arg)
         timing = Timer('creating unipartite graph for %d' % year)
 
         bipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
         unipartiteGraph = graph_funcs.loadGraph('Data/Unipartite-Graphs/%d.graph' % year, snap.TUNGraph)
-
-        addConnectedComponentAtrributes(unipartiteGraph)
-        graph_funcs.saveGraph(unipartiteGraph, 'Data/Unipartite-Graphs/%d.graph' % year)
-
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 

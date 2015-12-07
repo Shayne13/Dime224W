@@ -5,26 +5,26 @@ import numpy as np
 # Params: graph as snap.TNEANet graph
 #         featureFunc as function from int (node id in bipartite graph) to
 #                        category (either int or string)
-#         isRecip: optional bool indicating whether to iterate over recipients
-#                  (default) or donors
+#         iteratorFunc: pass in graph_funcs.getDonors or graph_funcs.getRecipients or 
+#                        graph_funcs.getAllNodeIDs
 #         full: optional bool indicating whether to iterate over all donor/
 #               recipient nodes (default) or only full nodes.
-# Returns: function from TNEANet node to a numpy vector
+# Returns: function from category (either int or string) to a numpy vector
 # ----------------------------------
 # Creates a function that produces a feature vector based on a particular
 # categorical attribute. This is done using dummy variables for all but one of
 # the values that the string attribute can take.
-def getCategoricalFeatureVec(graph, featureFunc, isRecip=True, full=False):
+def getCategoricalFeatureVec(featureFunc, iterator):
     categories = {}
-    iteratorFunc = graph_funcs.getRecipients if isRecip else graph_funcs.getDonors
+    # iteratorFunc = graph_funcs.getRecipients if isRecip else graph_funcs.getDonors
 
-    for node in iteratorFunc(graph, full=full):
+    for node in iterator:
         val = featureFunc(node.GetId())
         if val not in categories: categories[val] = len(categories)
 
-    def getFeatures(node):
+    def getFeatures(cat):
         features = np.zeros(len(categories) - 1)
-        index = categories[featureFunc(node.GetId())]
+        index = categories[cat]
         if index < len(features): features[index] = 1
         return features
 
@@ -37,12 +37,13 @@ def getCategoricalFeatureVec(graph, featureFunc, isRecip=True, full=False):
 #                  (default) or donors
 #         full: optional bool indicating whether to iterate over all donor/
 #               recipient nodes (default) or only full nodes.
-# Returns: function from TNEANet node to a numpy vector
+# Returns: function from category (either int or string) to a numpy vector
 # ------------------------------
 # Convenience wrapper around getCategoricalFeatureVec for the common case of
 # a categorical int node attribute in the bipartite graph.
 def getIntAttrFeatureVec(graph, attr, isRecip=True, full=False):
     featureFunc = lambda nodeid: graph.GetIntAttrDatN(nodeid, attr)
+    coreIteratorFunc = graph_funcs.getRecipients(graph) if isRecip else graph_funcs.getDonors
     return getCategoricalFeatureVec(graph, featureFunc, isRecip, full)
 
 # Function: getStrAttrFeatureVec
@@ -52,7 +53,7 @@ def getIntAttrFeatureVec(graph, attr, isRecip=True, full=False):
 #                  (default) or donors
 #         full: optional bool indicating whether to iterate over all donor/
 #               recipient nodes (default) or only full nodes.
-# Returns: function from TNEANet node to a numpy vector
+# Returns: function from category (either int or string) to a numpy vector
 # ------------------------------
 # Convenience wrapper around getCategoricalFeatureVec for the common case of
 # a categorical string node attribute in the bipartite graph.
