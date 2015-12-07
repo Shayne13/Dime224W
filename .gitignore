@@ -2,3 +2,4 @@ Data/
 data/
 *ipynb
 *pyc
+*.DS_Store
