@@ -145,7 +145,9 @@ def processDonorFeaturesForRecip(donorFeatures, weightsForDonors):
     averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
     averageOfSquares = np.average(np.square(unnormalizedFeatureVecs), weights=weights, axis=0)
     stdevs = np.sqrt(averageOfSquares - np.square(averages))
+    # variances = averageOfSquares - averages
 
+    # return np.append(features, [averages, variances])
     return np.append(features, [averages, stdevs])
 
 # This calculates weighted quantiles.
