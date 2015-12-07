@@ -18,7 +18,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
     timing.markEvent('Extracted bipartite features.')
 
-    rawUnifeatures, componentFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
     unipartiteFeatures = convertNewToOldIDs(rawUnifeatures, newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
@@ -31,7 +31,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
         if oldNID in unipartiteFeatures:
             features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
         else:
-            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc)
+            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc, communityFeatureFuncn)
     timing.finish()
 
     return features
@@ -65,7 +65,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing = Timer('extracting unipartite features')
 
     features = defaultdict(list)
-    componentFeatureFunc = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
+    componentFeatureFunc, communityFeatureFuncn = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
 
     timing.markEvent('1. Extracted surface features')
 
@@ -84,24 +84,29 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     cnctComponents = calcCnctComponents(unipartiteGraph)
     timing.markEvent('3. Computed connected components.')
 
+    # Size of community:
+    communities = calcCommunities(unipartiteGraph)
+    timing.markEvent('4. Computed communities.')
+
     # Node clustering coefficients:
     # NIdCCfH = snap.TIntFltH()
     # snap.GetNodeClustCf(unipartiteGraph, NIdCCfH)
-    timing.markEvent('4. Computed clustering coefficients.')
+    timing.markEvent('5. Computed clustering coefficients.')
 
     # Eigenvectors:
     # eigenVal, eigenVec = sp.linalg.eigs(adjMat, k=1)
-    timing.markEvent('5. Computed eigenvectors.')
+    timing.markEvent('6. Computed eigenvectors.')
 
     # Pagerank:
     pageRanks = snap.TIntFltH()
     snap.GetPageRank(unipartiteGraph, pageRanks)
-    timing.markEvent('6. Computed PageRank.')
+    timing.markEvent('7. Computed PageRank.')
 
     # combine the graph wide features with the existing surface features:
     for nid in features:
         # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
+        features[nid].append(communities[nid])
         # features[nid].append(NIdCCfH[nid])
         # features[nid].append(float(eigenVec[nid][0]))
         features[nid].append(pageRanks[nid])
@@ -114,7 +119,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # print 'eigenval: ' + str(eigenVal)
 
 
-    return features, componentFeatureFunc
+    return features, componentFeatureFunc, communityFeatureFuncn
 
 # Takes the graph and adjacency matrix, and uses these to update the
 # features map for the unipartite graph.
@@ -126,7 +131,11 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
     idToCC = labelConnectedComponents(graph)
     featureFunc = lambda x: 0.0 if x not in idToCC else idToCC[x]
     componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
-
+    
+    idToCommunitiy = labelCommunities(graph)
+    featureFunc = lambda x: 0.0 if x not in idToCommunitiy else idToCommunitiy[x]
+    communityFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
+    
     for node in graph.Nodes():
         nid = node.GetId()
 
@@ -139,8 +148,9 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
 
         # Connecetd component category features:
         features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
+        features[nid] += componentFeatureFunc(idToCommunitiy[nid]).tolist()
 
-    return componentFeatureFunc
+    return componentFeatureFunc, communityFeatureFunc
 
 # Efficiently computes the connected components of the graph returning
 # a dictionary: { nid -> lenComp }
@@ -159,6 +169,18 @@ def calcCnctComponents(graph):
 
     return lenComps
 
+# Efficiently computes the connected components of the graph returning
+# a dictionary: { nid -> lenComp }
+def calcCommunities(graph):
+    lenCommunities = {}
+
+    CmtyV = snap.TCnComV()
+    snap.CommunityGirvanNewman(graph, CmtyV)
+    for Cmty in CmtyV:
+      for NI in Cmty:
+        lenCommunities[NI] = Cmty.Len()
+
+    return lenCommunities
 
 # Given a bipartite donor-candidate graph, returns 5 relevant dictionaries
 # from cnodeids to various donation metrics. These are, in order,
@@ -211,10 +233,11 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
     return oldIDFeatureMapping
 
 # The default unipartite features for a node not in the unipartite graph:
-def defaultUnipartiteFeatures(componentFeatureFunc):
+def defaultUnipartiteFeatures(componentFeatureFunc, communityFeatureFunc):
     defaultFeatures = []
     defaultFeatures.append(0.0) # degree
     defaultFeatures += componentFeatureFunc(0).tolist()
+    defaultFeatures += communityFeatureFunc(0).tolist()
     # defaultFeatures.append() # nodes at hop 2
     # defaultFeatures.append(0) # avg. weight of edges
     defaultFeatures.append(1.0) # size of connected component
@@ -243,6 +266,24 @@ def labelConnectedComponents(graph):
             for cnid in CnCom:
                 components[cnid] = component
         component += 1
+
+    return components
+
+# Creates a dictionary from node id to connected component index for a given graph.
+def labelCommunities(graph):
+
+    communities = {}
+    CmtyV = snap.TCnComV()
+    snap.CommunityGirvanNewman(graph, CmtyV)
+
+    community = 1
+    for Cmty in CmtyV:
+        for NI in Cmty:
+          if Cmty.Len() == 1:
+            communities[NI] = 0.0
+          else:
+            communities[NI] = community
+        community += 1
 
     return components
 
@@ -279,7 +320,8 @@ if __name__ == '__main__':
 # 2. nodes at hop 2
 # 3. avg. weight of edges
 # 4. size of connected component
-# 5. categorical label of connected component
-# 6. clustering coefficient
-# 7. eigenvector value
-# 8. pagerank score
+# 5. size of community
+# 6. categorical label of connected component
+# 7. clustering coefficient
+# 8. eigenvector value
+# 9. pagerank score
