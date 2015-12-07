@@ -205,6 +205,13 @@ def defaultUnipartiteFeatures():
     defaultFeatures.append(0.0) # pagerank score
     return defaultFeatures
 
+# Adds the size of the connected component as an attribute for each node in the unipartiteGraph
+def addConnectedComponentSizeAtrributes(unipartiteGraph):
+    unipartiteGraph.AddIntAttrN('ConnectedComponentSize')
+    cnctComponents = calcCnctComponents(unipartiteGraph)
+    for node in unipartiteGraph.Nodes():
+        nid = node.GetId()
+        unipartiteGraph.AddIntAttrDatN(nid, cnctComponents[nid], 'ConnectedComponentSize')         
 
 if __name__ == '__main__':
     for year in range(1980, 1982, 2):
@@ -213,6 +220,10 @@ if __name__ == '__main__':
 
         bipartiteGraph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
         unipartiteGraph = graph_funcs.loadGraph('Data/Unipartite-Graphs/%d.graph' % year, snap.TUNGraph)
+
+        addConnectedComponentSizeAtrributes(unipartiteGraph)
+        graph_funcs.saveGraph(unipartiteGraph, 'Data/Unipartite-Graphs/%d.graph' % year)
+
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 
