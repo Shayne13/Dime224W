@@ -47,7 +47,7 @@ def trainAndTestModels(year, extension, k = 10,
 ################################################################################
 
 if __name__ == '__main__':
-    extensions = ['jaccard', 'jaccard2', 'affinity', 'baseline']
+    extensions = ['jaccard', 'jaccard2', 'affinity', 'cosine', 'baseline']
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Running regressions for %d' % year)

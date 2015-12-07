@@ -212,7 +212,7 @@ def getAllRecipSpecificFeatures(graph, rnodeid):
 ################################################################################
 
 if __name__ == '__main__':
-    weightings = ('jaccard', 'jaccard2', 'affinity')
+    weightings = ('jaccard', 'jaccard2', 'affinity', 'cosine')
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Generating features for %d' % year)

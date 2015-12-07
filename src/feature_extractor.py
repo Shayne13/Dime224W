@@ -18,7 +18,8 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
     timing.markEvent('Extracted bipartite features.')
 
-    rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    # rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    rawUnifeatures, componentFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
     unipartiteFeatures = convertNewToOldIDs(rawUnifeatures, newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
@@ -31,7 +32,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
         if oldNID in unipartiteFeatures:
             features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
         else:
-            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc, communityFeatureFuncn)
+            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc) #, communityFeatureFuncn)
     timing.finish()
 
     return features
@@ -65,7 +66,8 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing = Timer('extracting unipartite features')
 
     features = defaultdict(list)
-    componentFeatureFunc, communityFeatureFuncn = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
+    #componentFeatureFunc, communityFeatureFuncn, idToCommunity = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
+    componentFeatureFunc = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
 
     timing.markEvent('1. Extracted surface features')
 
@@ -85,7 +87,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing.markEvent('3. Computed connected components.')
 
     # Size of community:
-    communities = calcCommunities(unipartiteGraph)
+    # communities = calcCommunities(idToCommunity)
     timing.markEvent('4. Computed communities.')
 
     # Node clustering coefficients:
@@ -106,7 +108,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     for nid in features:
         # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
-        features[nid].append(communities[nid])
+        # features[nid].append(communities[nid])
         # features[nid].append(NIdCCfH[nid])
         # features[nid].append(float(eigenVec[nid][0]))
         features[nid].append(pageRanks[nid])
@@ -119,7 +121,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # print 'eigenval: ' + str(eigenVal)
 
 
-    return features, componentFeatureFunc, communityFeatureFuncn
+    return features, componentFeatureFunc #, communityFeatureFuncn
 
 # Takes the graph and adjacency matrix, and uses these to update the
 # features map for the unipartite graph.
@@ -132,9 +134,9 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
     featureFunc = lambda x: 0.0 if x not in idToCC else idToCC[x]
     componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
     
-    idToCommunitiy = labelCommunities(graph)
-    featureFunc = lambda x: 0.0 if x not in idToCommunitiy else idToCommunitiy[x]
-    communityFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
+    # idToCommunity = labelCommunities(graph)
+    # featureFunc = lambda x: 0.0 if x not in idToCommunity else idToCommunity[x]
+    # communityFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
     
     for node in graph.Nodes():
         nid = node.GetId()
@@ -146,11 +148,11 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
         # nodesAtHop = snap.TIntV()
         # features[nid].append(snap.GetNodesAtHop(graph, nid, 2, nodesAtHop, False))
 
-        # Connecetd component category features:
+        # Connected component category features:
         features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
-        features[nid] += componentFeatureFunc(idToCommunitiy[nid]).tolist()
+        # features[nid] += componentFeatureFunc(idToCommunitiy[nid]).tolist()
 
-    return componentFeatureFunc, communityFeatureFunc
+    return componentFeatureFunc #, communityFeatureFunc, idToCommunitiy
 
 # Efficiently computes the connected components of the graph returning
 # a dictionary: { nid -> lenComp }
@@ -169,16 +171,17 @@ def calcCnctComponents(graph):
 
     return lenComps
 
-# Efficiently computes the connected components of the graph returning
-# a dictionary: { nid -> lenComp }
-def calcCommunities(graph):
-    lenCommunities = {}
 
-    CmtyV = snap.TCnComV()
-    snap.CommunityGirvanNewman(graph, CmtyV)
-    for Cmty in CmtyV:
-      for NI in Cmty:
-        lenCommunities[NI] = Cmty.Len()
+# Returns the sizes of the communities as a map from node id to size
+def calcCommunities(idToCommunity):
+    communityLens = defaultdict(int) # community ID to community size
+    lenCommunities = {} # node ID to community size
+
+    for nid in idToCommunity:
+        communityLens[idToCommunity[nid]] += 1
+
+    for nid in idToCommunity:
+        lenCommunities[nid] = communityLens[idToCommunity[nid]]
 
     return lenCommunities
 
@@ -233,11 +236,11 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
     return oldIDFeatureMapping
 
 # The default unipartite features for a node not in the unipartite graph:
-def defaultUnipartiteFeatures(componentFeatureFunc, communityFeatureFunc):
+def defaultUnipartiteFeatures(componentFeatureFunc): #, communityFeatureFunc):
     defaultFeatures = []
     defaultFeatures.append(0.0) # degree
     defaultFeatures += componentFeatureFunc(0).tolist()
-    defaultFeatures += communityFeatureFunc(0).tolist()
+    # defaultFeatures += communityFeatureFunc(0).tolist()
     # defaultFeatures.append() # nodes at hop 2
     # defaultFeatures.append(0) # avg. weight of edges
     defaultFeatures.append(1.0) # size of connected component
@@ -269,7 +272,7 @@ def labelConnectedComponents(graph):
 
     return components
 
-# Creates a dictionary from node id to connected component index for a given graph.
+# Creates a dictionary from node id to community index for a given graph.
 def labelCommunities(graph):
 
     communities = {}
@@ -301,7 +304,7 @@ if __name__ == '__main__':
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 
-        for weightF in ['jaccard', 'affinity', 'jaccard2']:
+        for weightF in ['jaccard', 'affinity', 'jaccard2', 'cosine']:
             print '******* %s *******' % weightF
             adjMatrix = pickler.load('Data/Unipartite-Matrix/%d.%s' % (year, weightF))
             adjMatrix = adjMatrix.tocsc()

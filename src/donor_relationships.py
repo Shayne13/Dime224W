@@ -3,7 +3,7 @@
 # To call from the command line, run `python src/donor_relationships <years>`, where
 # <years> contains each year whose graph you want to generate.
 
-import snap
+import snap, math, sys
 from collections import defaultdict
 from util import pickler, graph_funcs
 from util.Timer import Timer
@@ -28,6 +28,7 @@ def createDonorDonorGraph(year, weightF):
     jaccardData = []
     jaccard2Data = []
     affinityData = []
+    cosineData = []
     r = []
     c = []
 
@@ -64,6 +65,8 @@ def createDonorDonorGraph(year, weightF):
             jaccard2Data.append(weights['jaccard2'])
             affinityData.append(weights['affinity'])
             affinityData.append(weights['affinity'])
+            cosineData.append(weights['cosine'])
+            cosineData.append(weights['cosine'])
 
             # Add the edges between the two nodes and their weights
             unipartiteGraph.AddEdge(newID1, newID2)
@@ -77,9 +80,10 @@ def createDonorDonorGraph(year, weightF):
     jaccardAdjMat = sp.csr_matrix((jaccardData, (r, c)), shape = (N, N))
     jaccard2AdjMat = sp.csr_matrix((jaccard2Data, (r, c)), shape = (N, N))
     affinityAdjMat = sp.csr_matrix((affinityData, (r, c)), shape = (N, N))
+    cosineAdjMat = sp.csr_matrix((cosineData, (r, c)), shape = (N, N))
 
     timing.finish()
-    return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat, newToOld, oldToNew
+    return unipartiteGraph, jaccardAdjMat, jaccard2AdjMat, affinityAdjMat, cosineAdjMat, newToOld, oldToNew
 
 # Takes in the bipartite graph and generates the initial unipartiteGraph with just nodes
 # and node attributes.
@@ -186,10 +190,12 @@ def getWeightScores(id1, id2, sharedCands, numDonations, totalAmount, cands, tra
     n1, s1 = jaccardSimilarity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
     n2, s2 = jaccardSimilarity2(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
     n3, s3 = affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
+    n4, s4 = cosSim(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts)
 
     weights[n1] = s1
     weights[n2] = s2
     weights[n3] = s3
+    weights[n4] = s4
 
     return weights
 
@@ -211,6 +217,15 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
     score = ((len(sharedCands) * len(cands)) / (len(cands[id1]) + len(cands[id2]))) / 1.0
     return 'affinity', score
 
+# Cosine Similarity:
+def cosSim(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
+    numerator = sum([ amounts[id1][cand] * amounts[id2][cand] for cand in sharedCands ])
+    denomA = math.sqrt(sum([ amounts[id1][cand] ** 2 for cand in sharedCands ]))
+    denomB = math.sqrt(sum([ amounts[id2][cand] ** 2 for cand in sharedCands ]))
+    score = numerator / (float(denomA) * denomB)
+    return 'cosine', score
+
+
 ################################################################################
 # Module command-line behavior #
 ################################################################################
@@ -221,7 +236,7 @@ if __name__ == '__main__':
         year = int(arg)
         timing = Timer('Creating unipartite graph for %d' % year)
 
-        graph, wmat1, wmat2, wmat3, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
+        graph, wmat1, wmat2, wmat3, wmat4, newToOld, oldToNew = createDonorDonorGraph(year, getWeightScores)
 
         # Save the SNAP graph:
         outfile = 'Data/Unipartite-Graphs/%d.graph' % year
@@ -232,6 +247,7 @@ if __name__ == '__main__':
         pickler.save(wmat1, matrixPrefix + '.jaccard')
         pickler.save(wmat2, matrixPrefix + '.jaccard2')
         pickler.save(wmat3, matrixPrefix + '.affinity')
+        pickler.save(wmat4, matrixPrefix + '.cosine')
 
         # Save the bipartite-unipartite corresponding node ID dictionaries:
         mappingPrefix = 'Data/Unipartite-NodeMappings/%d' % year
