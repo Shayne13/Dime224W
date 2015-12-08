@@ -19,7 +19,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     timing.markEvent('Extracted bipartite features.')
 
     # rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
-    rawUnifeatures, componentFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    rawUnifeatures, componentFeatureFunc, CNMFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
     unipartiteFeatures = convertNewToOldIDs(rawUnifeatures, newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
@@ -32,7 +32,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
         if oldNID in unipartiteFeatures:
             features[oldNID] = bipartiteFeatures[oldNID] + unipartiteFeatures[oldNID]
         else:
-            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc) #, communityFeatureFuncn)
+            features[oldNID] = bipartiteFeatures[oldNID] + defaultUnipartiteFeatures(componentFeatureFunc, CNMFeatureFunc) #, communityFeatureFuncn)
     timing.finish()
 
     return features
@@ -67,7 +67,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
 
     features = defaultdict(list)
     #componentFeatureFunc, communityFeatureFuncn, idToCommunity = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
-    componentFeatureFunc = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
+    componentFeatureFunc, CNMFeatureFunc, idToCNM = getUnipartiteSurfaceFeatures(unipartiteGraph, adjMat, features)
 
     timing.markEvent('1. Extracted surface features')
 
@@ -86,9 +86,9 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     cnctComponents = calcCnctComponents(unipartiteGraph)
     timing.markEvent('3. Computed connected components.')
 
-    # Size of community:
-    # communities = calcCommunities(idToCommunity)
-    timing.markEvent('4. Computed communities.')
+    # Size of CNM community:
+    communities = calcCommunities(idToCNM)
+    timing.markEvent('4. Computed CNM communities.')
 
     # Node clustering coefficients:
     # NIdCCfH = snap.TIntFltH()
@@ -108,7 +108,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     for nid in features:
         # features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
-        # features[nid].append(communities[nid])
+        features[nid].append(communities[nid])
         # features[nid].append(NIdCCfH[nid])
         # features[nid].append(float(eigenVec[nid][0]))
         features[nid].append(pageRanks[nid])
@@ -121,7 +121,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     # print 'eigenval: ' + str(eigenVal)
 
 
-    return features, componentFeatureFunc #, communityFeatureFuncn
+    return features, componentFeatureFunc, CNMFeatureFunc
 
 # Takes the graph and adjacency matrix, and uses these to update the
 # features map for the unipartite graph.
@@ -131,9 +131,13 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
 
     # Cateogrical connected component labels:
     idToCC = labelConnectedComponents(graph)
-    featureFunc = lambda x: 0.0 if x not in idToCC else idToCC[x]
-    componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
+    featureFunc1 = lambda x: 0.0 if x not in idToCC else idToCC[x]
+    componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc1, graph.Nodes())
     
+    idToCNM = labelCNMCommunity(graph)
+    featureFunc2 = lambda x: 0.0 if x not in idToCNM else idToCNM[x]
+    CNMFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc2, graph.Nodes())
+
     # idToCommunity = labelCommunities(graph)
     # featureFunc = lambda x: 0.0 if x not in idToCommunity else idToCommunity[x]
     # communityFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
@@ -150,9 +154,11 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
 
         # Connected component category features:
         features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
-        # features[nid] += componentFeatureFunc(idToCommunitiy[nid]).tolist()
 
-    return componentFeatureFunc #, communityFeatureFunc, idToCommunitiy
+        # CNM community category features:
+        features[nid] += CNMFeatureFunc(idToCNM[nid]).tolist()
+
+    return componentFeatureFunc, CNMFeatureFunc, idToCNM #, communityFeatureFunc, idToCommunitiy
 
 # Efficiently computes the connected components of the graph returning
 # a dictionary: { nid -> lenComp }
@@ -236,14 +242,15 @@ def convertNewToOldIDs(newIDFeatureMapping, newToOldIDs):
     return oldIDFeatureMapping
 
 # The default unipartite features for a node not in the unipartite graph:
-def defaultUnipartiteFeatures(componentFeatureFunc): #, communityFeatureFunc):
+def defaultUnipartiteFeatures(componentFeatureFunc, CNMFeatureFunc): #, communityFeatureFunc):
     defaultFeatures = []
     defaultFeatures.append(0.0) # degree
-    defaultFeatures += componentFeatureFunc(0).tolist()
-    # defaultFeatures += communityFeatureFunc(0).tolist()
     # defaultFeatures.append() # nodes at hop 2
+    defaultFeatures += componentFeatureFunc(0).tolist() # connected component category
+    defaultFeatures += CNMFeatureFunc(0).tolist() # CNM community category
     # defaultFeatures.append(0) # avg. weight of edges
     defaultFeatures.append(1.0) # size of connected component
+    defaultFeatures.append(1.0) # size of CNM community
     # defaultFeatures.append(0.0) # clustering coefficient
     # defaultFeatures.append(0.0) # eigenvector value
     defaultFeatures.append(0.0) # pagerank score
@@ -282,13 +289,32 @@ def labelCommunities(graph):
     community = 1
     for Cmty in CmtyV:
         for NI in Cmty:
-          if Cmty.Len() == 1:
-            communities[NI] = 0.0
-          else:
-            communities[NI] = community
+            if Cmty.Len() == 1:
+                communities[NI] = 0.0
+            else:
+                communities[NI] = community
         community += 1
 
-    return components
+    return communities
+
+# Clauset-Newman-Moore community detection: returns dictionary form nide id to community index
+def labelCNMCommunity(graph):
+
+    communities = {}
+    CmtyV = snap.TCnComV()
+    modularity = snap.CommunityCNM(graph, CmtyV)
+    # print "The modularity of the network is %f" % modularity
+
+    communityIndex = 1
+    for Cmty in CmtyV:
+        for nid in Cmty:
+            if Cmty.Len() == 1:
+                communities[nid] = 0.0
+            else:
+                communities[nid] = communityIndex
+        communityIndex += 1
+
+    return communities
 
 ################################################################################
 # Module command-line behavior #
@@ -304,7 +330,7 @@ if __name__ == '__main__':
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 
-        for weightF in ['jaccard', 'affinity', 'jaccard2', 'cosine']:
+        for weightF in ['jaccard', 'affinity', 'jaccard2', 'cosine', 'adamic', 'weighted_adamic']:
             print '******* %s *******' % weightF
             adjMatrix = pickler.load('Data/Unipartite-Matrix/%d.%s' % (year, weightF))
             adjMatrix = adjMatrix.tocsc()
@@ -317,6 +343,7 @@ if __name__ == '__main__':
         timing.finish()
 
 
+## OUTDATED:::
 # Features:
 
 # 1. degree 

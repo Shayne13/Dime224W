@@ -241,7 +241,7 @@ def getCategoricalGraphFeatures(graph, full=False):
 ################################################################################
 
 if __name__ == '__main__':
-    weightings = ('jaccard', 'jaccard2', 'affinity', 'cosine')
+    weightings = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'adamic', 'weighted_adamic')
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Generating features for %d' % year)

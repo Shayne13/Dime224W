@@ -95,4 +95,3 @@
 ## Attributes on Bipartite Graph Nodes:
 
 * 'IsRecip' is 0: contributor, 1: recipient with CFScore, or 2: recipipent without CFScore
-* 'WccId' is the id of the weakly connected component that the node is in
