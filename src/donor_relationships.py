@@ -145,35 +145,6 @@ def getDonorInfos(graph):
 
     return numDonations, totalAmount, cands, transactions, amounts
 
-# Clones a particular node from one graph to another, keeping the original
-# node id and attributes but discarding all of the edges
-def cloneNode(graph1, graph2, nodeid):
-    graph2.AddNode(nodeid)
-
-    # Copy the attributes and names from the original node
-    intNames = snap.TStrV()
-    fltNames = snap.TStrV()
-    strNames = snap.TStrV()
-    intVals = snap.TIntV()
-    fltVals = snap.TFltV()
-    strVals = snap.TStrV()
-
-    graph1.IntAttrNameNI(nodeid, intNames)
-    graph1.FltAttrNameNI(nodeid, fltNames)
-    graph1.StrAttrNameNI(nodeid, strNames)
-    graph1.IntAttrValueNI(nodeid, intVals)
-    graph1.FltAttrValueNI(nodeid, fltVals)
-    graph1.StrAttrValueNI(nodeid, strVals)
-
-    # Add each of the attributes to the new node by type
-    for i in range(intNames.Len()):
-        graph2.AddIntAttrDatN(nodeid, intVals[i], intNames[i])
-    for i in range(fltNames.Len()):
-        graph2.AddFltAttrDatN(nodeid, fltVals[i], fltNames[i])
-    for i in range(strNames.Len()):
-        graph2.AddStrAttrDatN(nodeid, strVals[i], strNames[i])
-
-
 # ----- WEIGHTING FUNCTIONS -----
 
 # The weighting function must take in the 2 cnodeids, their shared candidates
@@ -219,9 +190,9 @@ def affinity(id1, id2, sharedCands, numDonations, totalAmount, cands, transactio
 
 # Cosine Similarity:
 def cosSim(id1, id2, sharedCands, numDonations, totalAmount, cands, transactions, amounts):
-    numerator = sum([ amounts[id1][cand] * amounts[id2][cand] for cand in sharedCands ])
-    denomA = math.sqrt(sum([ amounts[id1][cand] ** 2 for cand in sharedCands ]))
-    denomB = math.sqrt(sum([ amounts[id2][cand] ** 2 for cand in sharedCands ]))
+    numerator = sum([amounts[id1][cand] * amounts[id2][cand] for cand in sharedCands])
+    denomA = math.sqrt(sum([amounts[id1][cand] ** 2 for cand in sharedCands]))
+    denomB = math.sqrt(sum([amounts[id2][cand] ** 2 for cand in sharedCands]))
     score = numerator / (float(denomA) * denomB)
     return 'cosine', score
 
