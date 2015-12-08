@@ -30,8 +30,6 @@ def trainAndTestModels(year, extension, k = 10,
     for train, test in kf:
         X_train, X_test = X[train], X[test]
         Y_train, Y_test = Y[train], Y[test]
-        print np.isfinite(X_train).all()
-        print np.isfinite(Y_train).all()
         clf.fit(X_train, Y_train)
         rsquareds.append(clf.score(X_test, Y_test))
     timing.markEvent('Ran regression')
@@ -44,7 +42,7 @@ def trainAndTestModels(year, extension, k = 10,
 ################################################################################
 
 if __name__ == '__main__':
-    extensions = ['jaccard', 'jaccard2', 'affinity', 'cosine', 'baseline']
+    extensions = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'baseline')
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Running regressions for %d' % year)

@@ -20,7 +20,7 @@ from util.categorical import *
 # Given a bipartite donor-recipient graph and a dictionary from cnodeids to
 # feature vectors, creates a dictionary from rnodeids to feature vectors.
 def getRecipFeatures(graph, donorFeatures, receiptsFromDonor, totalReceipts,
-        totalDonations, partialFeatures, fullFeatures):
+        totalDonations, partialFeatures, fullFeatures, includeDonorFeatures=False):
     timing = Timer('Getting recipient features')
     recipFeatures = {}
 
@@ -33,11 +33,14 @@ def getRecipFeatures(graph, donorFeatures, receiptsFromDonor, totalReceipts,
             pct = receiptsFromDonor[rnodeid][donor] / float(totalDonations[donor])
             donorFeatures[donor].append(pct)
 
-        recipFeatures[rnodeid] = processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
-        #recipFeatures[rnodeid] = np.append(
-        #    getPartialNodeRecipSpecificFeatures(graph, rnodeid),
-        #    processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
-        #)
+        if includeDonorFeatures:
+            recipFeatures[rnodeid] = np.append(
+                getPartialNodeRecipSpecificFeatures(graph, rnodeid),
+                processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
+            )
+        else:
+            recipFeatures[rnodeid] = \
+                processDonorFeaturesForRecip(donorFeatures, receiptsFromDonor[rnodeid])
 
         # Remove the temporarily added feature for what percent of this donor's
         # donations went to this candidate.
@@ -53,6 +56,8 @@ def getRecipFeatures(graph, donorFeatures, receiptsFromDonor, totalReceipts,
 # features can be calculated.
 def getBaselineFeatures(graph, totalReceipts, partialFeatures, fullFeatures):
     features = {}
+
+
     for node in graph_funcs.getRecipients(graph, cfs=True, full=True):
         rnodeid = node.GetId()
         features[rnodeid] = np.append(
@@ -122,34 +127,38 @@ def getDonationAmounts(graph):
 # computes the portion of the recipient's feature vector dependent on the donor
 # features.
 #
-# Currently calculates min, max, mean, median, 25-quantile, 75-quantile and standard deviation.
+# Currently calculates min, max, mean, median, 25th percentile and 75 percentile.
+# First, the min, 25th percentile, median, 75th percentile, and max for each feature
+# are put in the feature vector, grouped by the donor feature they represent. Next,
+# the weighted averages of all the donor features are added to the end of the feature
+# vector. All statistics for the donor features are weighted by that donor's donations
+# to this candidate.
 def processDonorFeaturesForRecip(donorFeatures, weightsForDonors):
-    # NB: Everything added to features is weighted
+    # Let N be the number of donor features and M be the number of donors in
+    # weightsForDonors
 
-    # Should be 7N X 1 vector where N is number of (donor) features
+    # Should be a 5N X 1 vector
     features = np.zeros(0)
-    
-    # M x 1 vector, where M is number of donors in weightsForDonors
+
+    # M x 1 vector
     weights = [weightsForDonors[donor] for donor in weightsForDonors]
 
-    # M X N matrix, where M is number of donors in weightsForDonors and N is number of features
+    # M X N matrix
     unnormalizedFeatureVecs = np.array([donorFeatures[donor] for donor in weightsForDonors])
     squares = []
-    
+
     # Iterate over the columns (distribution for a feature) calculating quantiles and squares.
     # Runs N times
     for col in range(len(unnormalizedFeatureVecs[0])):
         # 5 X 1 vector
         quantiles = weighted_quantile(unnormalizedFeatureVecs[:,col], [0.0, 0.25, 0.5, 0.75, 1.0], sample_weight=weights)
         features = np.append(features, quantiles)
-    
-    averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
-    averageOfSquares = np.average(np.square(unnormalizedFeatureVecs), weights=weights, axis=0)
-    stdevs = np.sqrt(averageOfSquares - np.square(averages))
-    # variances = averageOfSquares - averages
 
-    # return np.append(features, [averages, variances])
-    return np.append(features, [averages, stdevs])
+    # N x 1 vector
+    averages = np.average(unnormalizedFeatureVecs, weights=weights, axis=0)
+
+    # 6N X 1 vector
+    return np.append(features, averages)
 
 # This calculates weighted quantiles.
 # Modified from https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy.
@@ -195,13 +204,7 @@ def weighted_quantile(values, quantiles, sample_weight=None, values_sorted=False
 # nodes.
 def getFullNodeRecipFeatures(graph, rnodeid, fullFeatures):
     node = graph.GetNI(rnodeid)
-    dummies = reduce(np.append, [f(node) for f in fullFeatures.values()])
-    reals = np.asarray([
-        graph.GetFltAttrDatN(rnodeid, 'partisanship'),
-        #graph.GetFltAttrDatN(rnodeid, 'indistrict'),
-        graph.GetFltAttrDatN(rnodeid, 'instate'),
-    ])
-    return np.append(dummies, reals)
+    return reduce(np.append, [f(node) for f in fullFeatures.values()])
 
 # Creates a feature vector of the node features available even to partial recipient
 # nodes.
@@ -218,13 +221,13 @@ def getPartialNodeRecipFeatures(graph, rnodeid, totalReceipts, partialFeatures):
 # first dict has the feature functions for the features available even for partial
 # nodes, while the second has the feature functions for the features only
 # available for full nodes
-def getCategoricalGraphFeatures(graph):
+def getCategoricalGraphFeatures(graph, full=False):
     partialFeatures = {}
     fullFeatures = {}
 
-    partialFeatures['party'] = getIntAttrFeatureVec(graph, 'party')
-    partialFeatures['district'] = getStrAttrFeatureVec(graph, 'district')
-    partialFeatures['seat'] = getStrAttrFeatureVec(graph, 'seat')
+    partialFeatures['party'] = getIntAttrFeatureVec(graph, 'party', full=full)
+    partialFeatures['district'] = getStrAttrFeatureVec(graph, 'district', full=full)
+    partialFeatures['seat'] = getStrAttrFeatureVec(graph, 'seat', full=full)
 
     fullFeatures['incumb'] = getIntAttrFeatureVec(graph, 'incumb', full=True)
     fullFeatures['gender'] = getIntAttrFeatureVec(graph, 'gender', full=True)
