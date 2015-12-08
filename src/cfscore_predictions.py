@@ -7,8 +7,9 @@
 
 import sys
 import numpy as np
-from sklearn.cross_validation import KFold
 from sklearn import linear_model
+from sklearn.cross_validation import KFold
+from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from util import pickler
 from util.Timer import Timer
 
@@ -18,7 +19,7 @@ from util.Timer import Timer
 
 def trainAndTestModels(year, extension, k = 10,
         clf = linear_model.LinearRegression(),
-        transF = None):
+        transF = None, decomp_func=None):
     timing = Timer('Running regression for %d.%s' % (year, extension))
     X, Y = pickler.load('Data/Recip-Features/%d.%s' % (year, extension))
     if transF: Y = transF(Y)
@@ -30,6 +31,12 @@ def trainAndTestModels(year, extension, k = 10,
     for train, test in kf:
         X_train, X_test = X[train], X[test]
         Y_train, Y_test = Y[train], Y[test]
+
+        if decomp_func:
+            decomp_func.fit(X_train)
+            X_train = decomp_func.transform(X_train)
+            X_test = decomp_func.transform(X_test)
+
         clf.fit(X_train, Y_train)
         rsquareds.append(clf.score(X_test, Y_test))
     timing.markEvent('Ran regression')
