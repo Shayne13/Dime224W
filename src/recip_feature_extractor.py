@@ -19,12 +19,10 @@ from util.categorical import *
 
 # Given a bipartite donor-recipient graph and a dictionary from cnodeids to
 # feature vectors, creates a dictionary from rnodeids to feature vectors.
-def getRecipFeatures(graph, donorFeatures):
+def getRecipFeatures(graph, donorFeatures, receiptsFromDonor, totalReceipts,
+        totalDonations, partialFeatures, fullFeatures):
     timing = Timer('Getting recipient features')
     recipFeatures = {}
-
-    # Load the donation amounts for cands, donors, and cand-donor combos
-    receiptsFromDonor, totalReceipts, totalDonations = getDonationAmounts(graph)
 
     for recipNode in graph_funcs.getRecipients(graph, cfs=True):
         rnodeid = recipNode.GetId()
@@ -53,11 +51,14 @@ def getRecipFeatures(graph, donorFeatures):
 # has the node-specific features to be used in the baseline. To improve the quality
 # of the baseline, this is restricted to full nodes for which all node specific
 # features can be calculated.
-def getBaselineFeatures(graph):
+def getBaselineFeatures(graph, totalReceipts, partialFeatures, fullFeatures):
     features = {}
     for node in graph_funcs.getRecipients(graph, cfs=True, full=True):
         rnodeid = node.GetId()
-        features[rnodeid] = getAllRecipSpecificFeatures(graph, rnodeid)
+        features[rnodeid] = np.append(
+            getPartialNodeRecipFeatures(graph, rnodeid, totalReceipts, partialFeatures),
+            getFullNodeRecipFeatures(graph, rnodeid, fullFeatures)
+        )
 
     return features
 
@@ -192,20 +193,45 @@ def weighted_quantile(values, quantiles, sample_weight=None, values_sorted=False
 
 # Creates a feature vector of the node features available only to full recipient
 # nodes.
-def getFullNodeRecipFeatures(graph, rnodeid):
-    return np.zeros(0)
+def getFullNodeRecipFeatures(graph, rnodeid, fullFeatures):
+    node = graph.GetNI(rnodeid)
+    dummies = reduce(np.append, [f(node) for f in fullFeatures.values()])
+    reals = np.asarray([
+        graph.GetFltAttrDatN(rnodeid, 'partisanship'),
+        #graph.GetFltAttrDatN(rnodeid, 'indistrict'),
+        graph.GetFltAttrDatN(rnodeid, 'instate'),
+    ])
+    return np.append(dummies, reals)
 
 # Creates a feature vector of the node features available even to partial recipient
 # nodes.
-def getPartialNodeRecipFeatures(graph, rnodeid):
-    return np.zeros(0)
+def getPartialNodeRecipFeatures(graph, rnodeid, totalReceipts, partialFeatures):
+    node = graph.GetNI(rnodeid)
+    dummies = reduce(np.append, [f(node) for f in partialFeatures.values()])
+    reals = np.asarray([
+        node.GetInDeg(),
+        totalReceipts[rnodeid],
+    ])
+    return np.append(dummies, reals)
 
-# Creates a feature vector of features specific to this particular recipient node.
-def getAllRecipSpecificFeatures(graph, rnodeid):
-    return np.append(
-        getFullNodeRecipFeatures(graph, rnodeid),
-        getPartialNodeRecipFeatures(graph, rnodeid),
-    )
+# Returns two ditionaries containing all the categorical feature functions. The
+# first dict has the feature functions for the features available even for partial
+# nodes, while the second has the feature functions for the features only
+# available for full nodes
+def getCategoricalGraphFeatures(graph):
+    partialFeatures = {}
+    fullFeatures = {}
+
+    partialFeatures['party'] = getIntAttrFeatureVec(graph, 'party')
+    partialFeatures['district'] = getStrAttrFeatureVec(graph, 'district')
+    partialFeatures['seat'] = getStrAttrFeatureVec(graph, 'seat')
+
+    fullFeatures['incumb'] = getIntAttrFeatureVec(graph, 'incumb', full=True)
+    fullFeatures['gender'] = getIntAttrFeatureVec(graph, 'gender', full=True)
+    fullFeatures['didprimary'] = getIntAttrFeatureVec(graph, 'didprimary', full=True)
+    fullFeatures['winner'] = getIntAttrFeatureVec(graph, 'winner', full=True)
+
+    return partialFeatures, fullFeatures
 
 ################################################################################
 # Module command-line behavior #
@@ -217,15 +243,20 @@ if __name__ == '__main__':
         year = int(year)
         timing = Timer('Generating features for %d' % year)
         graph = graph_funcs.loadGraph('Data/Bipartite-Graphs/%d.graph' % year)
+        receiptsFromDonor, totalReceipts, totalDonations = getDonationAmounts(graph)
+        partialFeatures, fullFeatures = getCategoricalGraphFeatures(graph)
 
-        baselineFeatures = getBaselineFeatures(graph)
+        baselineFeatures = \
+            getBaselineFeatures(graph, totalReceipts, partialFeatures, fullFeatures)
         saveFeatures(graph, baselineFeatures, 'Data/Recip-Features/%d.baseline' % year)
         timing.markEvent('Generated baseline features')
 
         for weighting in weightings:
             donorFeatures = pickler.load('Data/Features/%d%s.features' \
                     % (year, weighting))
-            recipFeatures = getRecipFeatures(graph, donorFeatures)
+            recipFeatures = getRecipFeatures(
+                    graph, donorFeatures, receiptsFromDonor, totalReceipts,
+                    totalDonations, partialFeatures, fullFeatures)
             saveFeatures(graph, recipFeatures, 'Data/Recip-Features/%d.%s' \
                     % (year, weighting))
             timing.markEvent('Calculated main recipient features for %s' \

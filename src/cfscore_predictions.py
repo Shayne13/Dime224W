@@ -30,17 +30,14 @@ def trainAndTestModels(year, extension, k = 10,
     for train, test in kf:
         X_train, X_test = X[train], X[test]
         Y_train, Y_test = Y[train], Y[test]
+        print np.isfinite(X_train).all()
+        print np.isfinite(Y_train).all()
         clf.fit(X_train, Y_train)
         rsquareds.append(clf.score(X_test, Y_test))
     timing.markEvent('Ran regression')
 
-    avgRSq = sum(rsquareds) / len(rsquareds)
-    with open('Data/Results/%d.%s' % (year, extension), 'w') as f:
-        f.write('K-fold validation results:\n')
-        f.write('Average: %f\n\n' % avgRSq)
-        for i, r in enumerate(rsquareds):
-            f.write('%d: %f\n' % (i, r))
     timing.finish()
+    return rsquareds
 
 ################################################################################
 # Module command-line behavior #
@@ -52,4 +49,11 @@ if __name__ == '__main__':
         year = int(year)
         timing = Timer('Running regressions for %d' % year)
         for extension in extensions:
-            trainAndTestModels(year, extension)
+            rsquareds = trainAndTestModels(year, extension)
+            avgRSq = sum(rsquareds) / len(rsquareds)
+            print '%d %s: %f' % (year, extension, avgRSq)
+            with open('Data/Results/%d.%s' % (year, extension), 'w') as f:
+                f.write('K-fold validation results:\n')
+                f.write('Average: %f\n\n' % avgRSq)
+                for i, r in enumerate(rsquareds):
+                    f.write('%d: %f\n' % (i, r))
