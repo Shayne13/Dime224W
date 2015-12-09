@@ -99,9 +99,11 @@ if __name__ == '__main__':
     # Dictionary from weighting function to the thresholds we'll use (based on
     # pdf and cdf plots for that weight)
     thresholdsDict = {
+        'adamic': [np.exp(-1.5), np.exp(-1), 1],
         'cosine': [0.8, 0.95, 0.99],
         'jaccard': [0.05, 0.1, 0.2],
         'jaccard2': [0.05, 0.1, 0.2],
+        'weighted_adamic': [np.exp(6), np.exp(8), np.exp(9)],
     }
 
     for arg in sys.argv[1:]:
