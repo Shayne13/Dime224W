@@ -213,7 +213,7 @@ def getPartialNodeRecipFeatures(graph, rnodeid, receiptsFromDonor, totalReceipts
 
     # Sum of contributions to this recipient from contributors who donated less than $200 to any candidate this cycle:
     donationsFromSmallContributors = \
-        sum([ receiptsFromDonor[rnodeid][cnodeid] if (totalDonations[cnodeid] < 200) for cnodeid in receiptsFromDonor[rnodeid]])
+        sum([ receiptsFromDonor[rnodeid][cnodeid] for cnodeid in receiptsFromDonor[rnodeid] if (totalDonations[cnodeid] < 200)])
     # Feature: percent of donations from low budget contributors
     percentDonationsFromSmallContributors = donationsFromSmallContributors / float(totalReceipts[rnodeid])
 
