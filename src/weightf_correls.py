@@ -38,10 +38,9 @@ def getCorrel(year, weightFs):
 ################################################################################
 
 if __name__ == '__main__':
-    weightFs = ('affinity', 'cosine', 'jaccard', 'jaccard2', 'adamic', 'weighted_adamic')
+    weightFs = (, 'cosine', 'jaccard', 'jaccard2', 'adamic', 'weighted_adamic')
     for arg in sys.argv[1:]:
         year = int(arg)
         cov = getCorrel(year, weightFs)
         print 'Correlation matrix for %d:' % year
         print cov
-

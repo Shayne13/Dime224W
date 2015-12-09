@@ -10,6 +10,7 @@ import numpy as np
 from sklearn import linear_model
 from sklearn.cross_validation import KFold
 from sklearn.decomposition import PCA, FastICA, FactorAnalysis
+from sklearn.preprocessing import StandardScaler
 from util import pickler
 from util.Timer import Timer
 
@@ -17,11 +18,11 @@ from util.Timer import Timer
 # Module functions #
 ################################################################################
 
-def trainAndTestModels(year, extension, k = 10,
-        clf = linear_model.LinearRegression(),
-        transF = None, decomp_func=None):
+def trainAndTestModels(year, extension, X=None, Y=None, k=10,
+        clf=linear_model.LinearRegression(), transF=None, decomp_func=None):
     timing = Timer('Running regression for %d.%s' % (year, extension))
-    X, Y = pickler.load('Data/Recip-Features/%d.%s' % (year, extension))
+    if X is None or Y is None:
+        X, Y = pickler.load('Data/Recip-Features/%d.%s' % (year, extension))
     if transF: Y = transF(Y)
     timing.markEvent('Loaded X and Y')
     rsquareds = []
@@ -49,7 +50,9 @@ def trainAndTestModels(year, extension, k = 10,
 ################################################################################
 
 if __name__ == '__main__':
-    extensions = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'adamic', 'weighted_adamic', 'baseline')
+    #extensions = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'adamic', 'weighted_adamic', 'baseline')
+    #extensions = ('jaccard2',)
+    extensions = ('jaccard2', 'baseline',)
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Running regressions for %d' % year)

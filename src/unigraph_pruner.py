@@ -28,6 +28,9 @@ def getSortedMatrixVals(filename):
     timing.markEvent('Zipped values')
     vals.sort(key=lambda v: v[2], reverse=True)
     timing.markEvent('Sorted values')
+    print vals[0][2] > vals[1][2]
+    print vals[0][2], vals[1][2]
+    raise ValueError("LOL")
     return vals, N
 
 # Given the vals from getSortedMatrixVals, the number of nodes, and a percent

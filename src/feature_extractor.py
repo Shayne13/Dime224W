@@ -15,11 +15,11 @@ import numpy as np
 def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     timing = Timer('generating features for %d' % year)
 
-    bipartiteFeatures = extractBipartiteFeatures(bipartiteGraph)
+    bipartiteFeatures = extractBipartiteFeatures(bipartite)
     timing.markEvent('Extracted bipartite features.')
 
-    # rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
-    rawUnifeatures, componentFeatureFunc, CNMFeatureFunc = extractUnipartiteFeatures(unipartiteGraph, adjMatrix)
+    # rawUnifeatures, componentFeatureFunc, communityFeatureFuncn = extractUnipartiteFeatures(unipartite, adjMatrix)
+    rawUnifeatures, componentFeatureFunc, CNMFeatureFunc = extractUnipartiteFeatures(unipartite, adjMatrix)
     unipartiteFeatures = convertNewToOldIDs(rawUnifeatures, newToOldIDs)
     timing.markEvent('Extracted unipartite features.')
 
@@ -72,11 +72,12 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing.markEvent('1. Extracted surface features')
 
     # Average weight of edges:
-    #avgWeights = calcAverageWeights(unipartiteGraph, adjMat)
+    avgWeights = calcAverageWeights(unipartiteGraph, adjMat)
+    #totalWeights = {adjMat
     timing.markEvent('2. Computed average weights.')
 
     # Size of connected component:
-    cnctComponents = calcCnctComponents(unipartiteGraph)
+    #cnctComponents = calcCnctComponents(unipartiteGraph)
     timing.markEvent('3. Computed connected components.')
 
     # Size of CNM community:
@@ -90,8 +91,8 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
 
     # combine the graph wide features with the existing surface features:
     for nid in features:
-        #features[nid].append(avgWeights[nid])
-        features[nid].append(cnctComponents[nid])
+        features[nid].append(avgWeights[nid])
+        #features[nid].append(cnctComponents[nid])
         features[nid].append(communities[nid])
         features[nid].append(pageRanks[nid])
 
@@ -129,27 +130,33 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
         # features[nid].append(snap.GetNodesAtHop(graph, nid, 2, nodesAtHop, False))
 
         # Connected component category features:
-        features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
+        #features[nid] += componentFeatureFunc(idToCC[nid]).tolist()
 
         # CNM community category features:
-        features[nid] += CNMFeatureFunc(idToCNM[nid]).tolist()
+        #features[nid] += CNMFeatureFunc(idToCNM[nid]).tolist()
 
     return componentFeatureFunc, CNMFeatureFunc, idToCNM #, communityFeatureFunc, idToCommunitiy
 
 def calcAverageWeights(graph, adjMat):
     neighbors = defaultdict(list)
+    timing = Timer('Calculating average weights')
     # Get all the nodes that a node borders in the graph
     for edge in graph.Edges():
         nodeid1 = edge.GetSrcNId()
         nodeid2 = edge.GetDstNId()
         neighbors[nodeid1].append(nodeid2)
         neighbors[nodeid2].append(nodeid1)
+    timing.markEvent('Gotten all neighbors')
 
     # Get the average weight per node connected to
     weights = {}
+    i = 0
     for nodeid in neighbors:
-        cols = neighbors[nodeid]
-        weights[nodeid] = adjMat[nodeid, cols].sum() / float(len(cols))
+        rows = neighbors[nodeid]
+        weights[nodeid] = adjMat[rows, nodeid].sum() / float(len(rows))
+        i += 1
+        if i % 1000 == 0:
+            timing.markEvent('Done with %d out of %d' % (i, len(neighbors)))
 
     return weights
 
@@ -239,10 +246,10 @@ def defaultUnipartiteFeatures(componentFeatureFunc, CNMFeatureFunc): #, communit
     defaultFeatures = []
     defaultFeatures.append(0.0) # degree
     # defaultFeatures.append() # nodes at hop 2
-    defaultFeatures += componentFeatureFunc(0).tolist() # connected component category
-    defaultFeatures += CNMFeatureFunc(0).tolist() # CNM community category
-    # defaultFeatures.append(0) # avg. weight of edges
-    defaultFeatures.append(1.0) # size of connected component
+    #defaultFeatures += componentFeatureFunc(0).tolist() # connected component category
+    #defaultFeatures += CNMFeatureFunc(0).tolist() # CNM community category
+    defaultFeatures.append(0) # avg. weight of edges
+    #defaultFeatures.append(1.0) # size of connected component
     defaultFeatures.append(1.0) # size of CNM community
     # defaultFeatures.append(0.0) # clustering coefficient
     # defaultFeatures.append(0.0) # eigenvector value
@@ -323,7 +330,8 @@ if __name__ == '__main__':
         newToOldIDs = pickler.load('Data/Unipartite-NodeMappings/%d.newToOld' % year)
         timing.markEvent('Loaded input graphs/matrices.')
 
-        for weightF in ['jaccard', 'affinity', 'jaccard2', 'cosine', 'adamic', 'weighted_adamic']:
+        #for weightF in ['jaccard', 'affinity', 'jaccard2', 'cosine', 'adamic', 'weighted_adamic']:
+        for weightF in ['jaccard2']:
             print '******* %s *******' % weightF
             adjMatrix = pickler.load('Data/Unipartite-Matrix/%d.%s' % (year, weightF))
             adjMatrix = adjMatrix.tocsc()

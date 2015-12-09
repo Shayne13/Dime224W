@@ -212,15 +212,15 @@ def getPartialNodeRecipFeatures(graph, rnodeid, receiptsFromDonor, totalReceipts
     node = graph.GetNI(rnodeid)
 
     # Sum of contributions to this recipient from contributors who donated less than $200 to any candidate this cycle:
-    donationsFromSmallContributors = \
-        sum([ receiptsFromDonor[rnodeid][cnodeid] for cnodeid in receiptsFromDonor[rnodeid] if (totalDonations[cnodeid] < 200)])
+    donationsFromSmallContributors = sum(receiptsFromDonor[rnodeid][cnodeid] \
+        for cnodeid in receiptsFromDonor[rnodeid] if (totalDonations[cnodeid] < 200))
     # Feature: percent of donations from low budget contributors
     percentDonationsFromSmallContributors = donationsFromSmallContributors / float(totalReceipts[rnodeid])
 
     dummies = reduce(np.append, [f(node) for f in partialFeatures.values()])
     reals = np.asarray([
         node.GetInDeg(),
-        totalReceipts[rnodeid],
+        np.log(totalReceipts[rnodeid]),
         percentDonationsFromSmallContributors,
     ])
 
@@ -250,7 +250,9 @@ def getCategoricalGraphFeatures(graph, full=False):
 ################################################################################
 
 if __name__ == '__main__':
-    weightings = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'adamic', 'weighted_adamic')
+    #weightings = ('jaccard', 'jaccard2', 'affinity', 'cosine', 'adamic', 'weighted_adamic')
+    #weightings = ('adamic', 'weighted_adamic')
+    weightings = ('jaccard2',)
     for year in sys.argv[1:]:
         year = int(year)
         timing = Timer('Generating features for %d' % year)
