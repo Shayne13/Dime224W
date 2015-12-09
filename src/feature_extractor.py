@@ -24,7 +24,7 @@ def generateFeatures(year, bipartite, unipartite, newToOldIDs, adjMatrix):
     timing.markEvent('Extracted unipartite features.')
 
     # append unipartite features to bipartite features for each node, returning combined feature dictionary.
-    # If the donor is not in the unipartite feature graph then we just take the default values (since the 
+    # If the donor is not in the unipartite feature graph then we just take the default values (since the
     # node falls below the unipartite threshold from sqlToGraphs):
     features = {}
     for donorNode in graph_funcs.getDonors(bipartite):
@@ -59,7 +59,7 @@ def extractBipartiteFeatures(bipartiteGraph):
 
     return features
 
-# Returns both the dictionary from unipartite node id to feature vector AND the categorical 
+# Returns both the dictionary from unipartite node id to feature vector AND the categorical
 # feature func for connected component ID.
 # TODO: Fix this decomp.
 def extractUnipartiteFeatures(unipartiteGraph, adjMat):
@@ -72,14 +72,7 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     timing.markEvent('1. Extracted surface features')
 
     # Average weight of edges:
-    # weightSums = adjMat.sum(axis=1)
-    # rows, cols = adjMat.nonzero()
-    # avgWeightDenoms = [0.0] * unipartiteGraph.GetNodes()
-    # for r in rows:
-    #     avgWeightDenoms[r] += 1.0
-    # avgWeights = weightSums / avgWeightDenoms
-    # zeros = [i for i in range(len(weightSums)) if weightSums[i] == 0]
-    # avgWeights[zeros] = 1.0 / len(avgWeights)
+    #avgWeights = calcAverageWeights(unipartiteGraph, adjMat)
     timing.markEvent('2. Computed average weights.')
 
     # Size of connected component:
@@ -90,36 +83,19 @@ def extractUnipartiteFeatures(unipartiteGraph, adjMat):
     communities = calcCommunities(idToCNM)
     timing.markEvent('4. Computed CNM communities.')
 
-    # Node clustering coefficients:
-    # NIdCCfH = snap.TIntFltH()
-    # snap.GetNodeClustCf(unipartiteGraph, NIdCCfH)
-    timing.markEvent('5. Computed clustering coefficients.')
-
-    # Eigenvectors:
-    # eigenVal, eigenVec = sp.linalg.eigs(adjMat, k=1)
-    timing.markEvent('6. Computed eigenvectors.')
-
     # Pagerank:
     pageRanks = snap.TIntFltH()
     snap.GetPageRank(unipartiteGraph, pageRanks)
-    timing.markEvent('7. Computed PageRank.')
+    timing.markEvent('5. Computed PageRank.')
 
     # combine the graph wide features with the existing surface features:
     for nid in features:
-        # features[nid].append(avgWeights[nid])
+        #features[nid].append(avgWeights[nid])
         features[nid].append(cnctComponents[nid])
         features[nid].append(communities[nid])
-        # features[nid].append(NIdCCfH[nid])
-        # features[nid].append(float(eigenVec[nid][0]))
         features[nid].append(pageRanks[nid])
 
     timing.finish()
-
-    # print 'Eigenvector check:'
-    # print 'min: ' + str(np.min(eigenVec)) + ' goes to ' + str(float(np.min(eigenVec)))
-    # print 'max: ' + str(np.max(eigenVec)) + ' goes to ' + str(float(np.max(eigenVec)))
-    # print 'eigenval: ' + str(eigenVal)
-
 
     return features, componentFeatureFunc, CNMFeatureFunc
 
@@ -133,7 +109,7 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
     idToCC = labelConnectedComponents(graph)
     featureFunc1 = lambda x: 0.0 if x not in idToCC else idToCC[x]
     componentFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc1, graph.Nodes())
-    
+
     idToCNM = labelCNMCommunity(graph)
     featureFunc2 = lambda x: 0.0 if x not in idToCNM else idToCNM[x]
     CNMFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc2, graph.Nodes())
@@ -141,7 +117,7 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
     # idToCommunity = labelCommunities(graph)
     # featureFunc = lambda x: 0.0 if x not in idToCommunity else idToCommunity[x]
     # communityFeatureFunc = categorical.getCategoricalFeatureVec(featureFunc, graph.Nodes())
-    
+
     for node in graph.Nodes():
         nid = node.GetId()
 
@@ -159,6 +135,23 @@ def getUnipartiteSurfaceFeatures(graph, adjMat, features):
         features[nid] += CNMFeatureFunc(idToCNM[nid]).tolist()
 
     return componentFeatureFunc, CNMFeatureFunc, idToCNM #, communityFeatureFunc, idToCommunitiy
+
+def calcAverageWeights(graph, adjMat):
+    neighbors = defaultdict(list)
+    # Get all the nodes that a node borders in the graph
+    for edge in graph.Edges():
+        nodeid1 = edge.GetSrcNId()
+        nodeid2 = edge.GetDstNId()
+        neighbors[nodeid1].append(nodeid2)
+        neighbors[nodeid2].append(nodeid1)
+
+    # Get the average weight per node connected to
+    weights = {}
+    for nodeid in neighbors:
+        cols = neighbors[nodeid]
+        weights[nodeid] = adjMat[nodeid, cols].sum() / float(len(cols))
+
+    return weights
 
 # Efficiently computes the connected components of the graph returning
 # a dictionary: { nid -> lenComp }
@@ -254,7 +247,7 @@ def defaultUnipartiteFeatures(componentFeatureFunc, CNMFeatureFunc): #, communit
     # defaultFeatures.append(0.0) # clustering coefficient
     # defaultFeatures.append(0.0) # eigenvector value
     defaultFeatures.append(0.0) # pagerank score
-    return defaultFeatures     
+    return defaultFeatures
 
 # Creates a dictionary from node id to connected component index for a given graph.
 def labelConnectedComponents(graph):
@@ -346,7 +339,7 @@ if __name__ == '__main__':
 ## OUTDATED:::
 # Features:
 
-# 1. degree 
+# 1. degree
 # 2. nodes at hop 2
 # 3. avg. weight of edges
 # 4. size of connected component
