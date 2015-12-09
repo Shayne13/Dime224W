@@ -54,14 +54,14 @@ def getRecipFeatures(graph, donorFeatures, receiptsFromDonor, totalReceipts,
 # has the node-specific features to be used in the baseline. To improve the quality
 # of the baseline, this is restricted to full nodes for which all node specific
 # features can be calculated.
-def getBaselineFeatures(graph, totalReceipts, partialFeatures, fullFeatures):
+def getBaselineFeatures(graph, receiptsFromDonor, totalReceipts, totalDonations, partialFeatures, fullFeatures):
     features = {}
 
 
     for node in graph_funcs.getRecipients(graph, cfs=True, full=True):
         rnodeid = node.GetId()
         features[rnodeid] = np.append(
-            getPartialNodeRecipFeatures(graph, rnodeid, totalReceipts, partialFeatures),
+            getPartialNodeRecipFeatures(graph, rnodeid, receiptsFromDonor, totalReceipts, totalDonations, partialFeatures),
             getFullNodeRecipFeatures(graph, rnodeid, fullFeatures)
         )
 
@@ -208,13 +208,22 @@ def getFullNodeRecipFeatures(graph, rnodeid, fullFeatures):
 
 # Creates a feature vector of the node features available even to partial recipient
 # nodes.
-def getPartialNodeRecipFeatures(graph, rnodeid, totalReceipts, partialFeatures):
+def getPartialNodeRecipFeatures(graph, rnodeid, receiptsFromDonor, totalReceipts, totalDonations, partialFeatures):
     node = graph.GetNI(rnodeid)
+
+    # Sum of contributions to this recipient from contributors who donated less than $200 to any candidate this cycle:
+    donationsFromSmallContributors = \
+        sum([ receiptsFromDonor[rnodeid][cnodeid] if (totalDonations[cnodeid] < 200) for cnodeid in receiptsFromDonor[rnodeid]])
+    # Feature: percent of donations from low budget contributors
+    percentDonationsFromSmallContributors = donationsFromSmallContributors / float(totalReceipts[rnodeid])
+
     dummies = reduce(np.append, [f(node) for f in partialFeatures.values()])
     reals = np.asarray([
         node.GetInDeg(),
         totalReceipts[rnodeid],
+        percentDonationsFromSmallContributors,
     ])
+
     return np.append(dummies, reals)
 
 # Returns two ditionaries containing all the categorical feature functions. The
@@ -250,7 +259,7 @@ if __name__ == '__main__':
         partialFeatures, fullFeatures = getCategoricalGraphFeatures(graph)
 
         baselineFeatures = \
-            getBaselineFeatures(graph, totalReceipts, partialFeatures, fullFeatures)
+            getBaselineFeatures(graph, receiptsFromDonor, totalReceipts, totalDonations, partialFeatures, fullFeatures)
         saveFeatures(graph, baselineFeatures, 'Data/Recip-Features/%d.baseline' % year)
         timing.markEvent('Generated baseline features')
 
